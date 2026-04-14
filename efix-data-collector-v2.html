@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="E-Fix">
+<title>E-Fix Data Collector</title>
+<!-- jsPDF loaded on demand when user taps Download PDF -->
+<style>
+  :root { --blue: #3b82f6; --red: #dc2626; --green: #16a34a; --dark: #1e293b; --grey: #64748b; --light: #f8fafc; --border: #e2e8f0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--light); color: var(--dark); max-width: 480px; margin: 0 auto; padding: 12px 16px; min-height: 100vh; padding-bottom: 80px; }
+  .header { text-align: center; padding: 16px 0 12px; border-bottom: 2px solid var(--border); margin-bottom: 16px; }
+  .logo { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+  .logo-svg { display: inline-block; max-width: 180px; margin-bottom: 8px; }
+  .subtitle { font-size: 12px; color: var(--grey); margin-top: 2px; }
+  .section { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 12px; border: 1px solid var(--border); }
+  .section-title { font-size: 14px; font-weight: 700; color: #334155; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  label { font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 4px; display: block; }
+  input, select, textarea { width: 100%; padding: 10px 12px; border-radius: 8px; font-size: 15px; border: 1.5px solid var(--border); background: #fff; outline: none; -webkit-appearance: none; appearance: none; color: var(--dark); }
+  input:focus, select:focus, textarea:focus { border-color: var(--blue); }
+  input.err, select.err { border-color: #f87171; background: #fef2f2; }
+  textarea { resize: vertical; min-height: 60px; }
+  .field { margin-bottom: 10px; }
+  .row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .row > * { flex: 1; min-width: 0; }
+  .btn { width: 100%; padding: 12px 16px; border-radius: 10px; font-size: 15px; font-weight: 600; border: none; cursor: pointer; text-align: center; display: block; color: #fff; }
+  .btn-blue { background: var(--blue); }
+  .btn-dark { background: var(--dark); }
+  .btn-purple { background: #7c3aed; }
+  .btn-grey { background: var(--border); color: #475569; }
+  .btn-sm { padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; border: none; cursor: pointer; }
+  .btn-row { display: flex; gap: 8px; margin-bottom: 20px; }
+  .btn-row > * { flex: 1; }
+  .cert-card { border: 2px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; cursor: pointer; background: #fff; transition: all 0.15s ease; }
+  .cert-card.sel { background: #fef2f2; }
+  .cert-card.sel-green { background: #f0fdf4; }
+  .cert-label { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .cert-desc { font-size: 12px; color: var(--grey); margin-top: 2px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .badge { font-size: 10px; font-weight: 700; color: #fff; border-radius: 4px; padding: 2px 6px; margin-left: 6px; vertical-align: middle; display: inline-block; }
+  .divider { height: 1px; background: var(--border); margin: 12px 0; }
+  .toggle-wrap { display: flex; align-items: center; gap: 10px; }
+  .toggle { width: 44px; height: 24px; border-radius: 12px; display: flex; align-items: center; padding: 2px; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
+  .toggle.off { background: #cbd5e1; }
+  .toggle.on { background: var(--blue); }
+  .toggle-dot { width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+  .toggle.on .toggle-dot { transform: translateX(20px); }
+  .toggle-label { font-size: 13px; font-weight: 500; color: #475569; }
+  .circuit-hdr { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #fff; border-radius: 8px; cursor: pointer; border: 1px solid var(--border); margin-bottom: 6px; }
+  .circuit-hdr.open { background: #f1f5f9; margin-bottom: 0; border-radius: 8px 8px 0 0; }
+  .circuit-body { padding: 12px 14px; border: 1px solid var(--border); border-top: none; border-radius: 0 0 8px 8px; margin-bottom: 6px; background: #fafbfc; }
+  .circuit-num { font-size: 13px; font-weight: 700; color: var(--blue); background: #eff6ff; border-radius: 6px; padding: 2px 8px; }
+  .circuit-desc { font-size: 13px; color: var(--grey); margin-left: 8px; }
+  .tpl-card { border: 2px solid var(--border); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; cursor: pointer; background: #fff; }
+  .tpl-card.sel { border-color: var(--blue); background: #eff6ff; }
+  .tpl-label { font-size: 14px; font-weight: 600; color: #334155; }
+  .tpl-sub { font-size: 11px; color: var(--grey); margin-top: 2px; }
+  .board-btn { flex: 1; text-align: center; padding: 8px 6px; border-radius: 8px; font-size: 12px; font-weight: 600; border: none; cursor: pointer; background: #f1f5f9; color: #475569; }
+  .board-btn.sel { background: var(--blue); color: #fff; }
+  .assess-btn { flex: 1; text-align: center; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: 600; border: none; cursor: pointer; }
+  .obs-card { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+  .summary-line { font-size: 13px; line-height: 1.8; color: #475569; }
+  .summary-line strong { color: #334155; }
+  .circuit-summary { font-size: 13px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; color: #475569; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--dark); color: #fff; padding: 10px 20px; border-radius: 10px; font-size: 14px; font-weight: 600; z-index: 999; box-shadow: 0 4px 12px rgba(0,0,0,0.2); display: none; }
+  .toast.show { display: block; animation: fadeInOut 2s ease; }
+  @keyframes fadeInOut { 0% { opacity: 0; transform: translateX(-50%) translateY(10px); } 10% { opacity: 1; transform: translateX(-50%) translateY(0); } 80% { opacity: 1; } 100% { opacity: 0; } }
+  .empty-msg { font-size: 13px; color: #94a3b8; text-align: center; padding: 12px; }
+  .test-title { font-size: 12px; font-weight: 700; color: var(--grey); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .remove-btn { background: #fee2e2; color: var(--red); }
+  .add-btn { background: #eff6ff; color: var(--blue); }
+  select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+  .pc-row { display: flex; gap: 6px; margin-bottom: 10px; }
+  .pc-row input { flex: 1; }
+  .pc-row button { flex-shrink: 0; width: auto; padding: 10px 14px; }
+  .addr-list { max-height: 200px; overflow-y: auto; border: 1.5px solid var(--blue); border-radius: 8px; margin-bottom: 10px; background: #fff; }
+  .addr-item { padding: 10px 12px; font-size: 14px; color: var(--dark); cursor: pointer; border-bottom: 1px solid var(--border); }
+  .addr-item:last-child { border-bottom: none; }
+  .addr-item:active { background: #eff6ff; }
+  .pc-status { font-size: 12px; color: var(--grey); margin-bottom: 8px; text-align: center; }
+  .pc-status.error { color: var(--red); }
+  .combo-wrap { position: relative; }
+  .combo-list { position: absolute; left: 0; right: 0; top: 100%; max-height: 200px; overflow-y: auto; background: #fff; border: 1.5px solid var(--blue); border-top: none; border-radius: 0 0 8px 8px; z-index: 50; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  .combo-list.open { display: block; }
+  .combo-item { padding: 10px 12px; font-size: 14px; cursor: pointer; border-bottom: 1px solid var(--border); }
+  .combo-item:last-child { border-bottom: none; }
+  .combo-item:active, .combo-item:hover { background: #eff6ff; }
+  .draft-card { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; background: #fff; display: flex; justify-content: space-between; align-items: flex-start; cursor: pointer; transition: all 0.15s ease; }
+  .draft-card:active { background: #f8fafc; }
+  .draft-info { flex: 1; }
+  .draft-name { font-size: 14px; font-weight: 600; color: var(--dark); }
+  .draft-meta { font-size: 12px; color: var(--grey); margin-top: 4px; }
+  .draft-badge { font-size: 10px; font-weight: 700; color: #fff; border-radius: 4px; padding: 2px 6px; display: inline-block; margin-right: 6px; }
+  .draft-delete { background: #fee2e2; color: var(--red); border: none; font-weight: 700; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 16px; flex-shrink: 0; margin-left: 8px; }
+  .drafts-section { margin-bottom: 16px; }
+  .drafts-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .clear-all-btn { background: none; border: none; color: #64748b; font-size: 12px; cursor: pointer; text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── Data ──────────────────────────────────────────────────────────────────
+
+const WIRING_TYPES = ["Twin & Earth","SWA","MICC","Flex","Singles in Conduit","Singles in Trunking","SY Cable","FP Cable","Data Cable"];
+const REF_METHODS = ["A","B","C","E","100","101","102","103"];
+const CSA_SIZES = ["1.0","1.5","2.5","4.0","6.0","10.0","16.0","25.0","35.0"];
+const BREAKER_RATINGS = ["3","5","6","10","13","16","20","25","32","40","45","50","63","80","100"];
+const BREAKER_TYPES = ["MCB (Type B)","MCB (Type C)","MCB (Type D)","RCBO (Type A)","RCBO (Type AC)","RCD","Fuse (BS88)","Fuse (BS1361)","Fuse (BS3036)"];
+const CIRCUIT_NAMES = [
+  "Lighting","Lighting Ground Floor","Lighting First Floor","Lighting Second Floor",
+  "Ring Final - Sockets","Ring Final - Downstairs Sockets","Ring Final - Upstairs Sockets",
+  "Radial - Sockets","Cooker","Oven","Hob","Shower","Electric Shower",
+  "Immersion Heater","Boiler","Smoke Alarms","Fire Alarms","Burglar Alarm",
+  "EV Charger","Garage Supply","Outbuilding Supply","Outside Lights","Garden Lights",
+  "Extractor Fan","Towel Rail","Underfloor Heating","Storage Heaters","Water Heater",
+  "Dishwasher","Washing Machine","Tumble Dryer","Fridge Freezer",
+  "CCTV","Data","Doorbell","Solar PV","Battery Storage","Air Source Heat Pump",
+  "UFH (Underfloor Heating)","Spur","FCU (Fused Connection Unit)",
+];
+const INSTALL_TYPES = ["New installation","Addition to existing installation","Alteration to existing installation"];
+const OBS_CODES = ["C1","C2","C3","FI"];
+
+const TEMPLATES = {
+  domestic_rcbo_6: { name: "6-Way Domestic RCBO", boardType: "rcbo", circuits: [
+    {description:"Lighting",wiringType:"Twin & Earth",refMethod:"C",points:"8",liveCSA:"1.5",cpcCSA:"1.0",breakerRating:"6",isRing:false},
+    {description:"Ring Final - Sockets",wiringType:"Twin & Earth",refMethod:"C",points:"12",liveCSA:"2.5",cpcCSA:"1.5",breakerRating:"32",isRing:true},
+    {description:"Cooker",wiringType:"Twin & Earth",refMethod:"C",points:"1",liveCSA:"6.0",cpcCSA:"2.5",breakerRating:"32",isRing:false},
+    {description:"Shower",wiringType:"Twin & Earth",refMethod:"C",points:"1",liveCSA:"10.0",cpcCSA:"4.0",breakerRating:"40",isRing:false},
+    {description:"Smoke Alarms",wiringType:"Twin & Earth",refMethod:"C",points:"4",liveCSA:"1.5",cpcCSA:"1.0",breakerRating:"6",isRing:false},
+    {description:"Immersion Heater",wiringType:"Twin & Earth",refMethod:"C",points:"1",liveCSA:"2.5",cpcCSA:"1.5",breakerRating:"16",isRing:false},
+  ]},
+  domestic_rcbo_10: { name: "10-Way Domestic RCBO", boardType: "rcbo", circuits: [
+    {description:"Lighting Ground Floor",wiringType:"Twin & Earth",refMethod:"C",points:"6",liveCSA:"1.5",cpcCSA:"1.0",breakerRating:"6",isRing:false},
+    {description:"Lighting First Floor",wiringType:"Twin & Earth",refMethod:"C",points:"6",liveCSA:"1.5",cpcCSA:"1.0",breakerRating:"6",isRing:false},
+    {description:"Ring Final - Downstairs Sockets",wiringType:"Twin & Earth",refMethod:"C",points:"8",liveCSA:"2.5",cpcCSA:"1.5",breakerRating:"32",isRing:true},
+    {description:"Ring Final - Upstairs Sockets",wiringType:"Twin & Earth",refMethod:"C",points:"8",liveCSA:"2.5",cpcCSA:"1.5",breakerRating:"32",isRing:true},
+    {description:"Cooker",wiringType:"Twin & Earth",refMethod:"C",points:"1",liveCSA:"6.0",cpcCSA:"2.5",breakerRating:"32",isRing:false},
+    {description:"Shower",wiringType:"Twin & Earth",refMethod:"C",points:"1",liveCSA:"10.0",cpcCSA:"4.0",breakerRating:"40",isRing:false},
+    {description:"Smoke Alarms",wiringType:"Twin & Earth",refMethod:"C",points:"4",liveCSA:"1.5",cpcCSA:"1.0",breakerRating:"6",isRing:false},
+    {description:"Immersion Heater",wiringType:"Twin & Earth",refMethod:"C",points:"1",liveCSA:"2.5",cpcCSA:"1.5",breakerRating:"16",isRing:false},
+    {description:"Boiler",wiringType:"Twin & Earth",refMethod:"C",points:"1",liveCSA:"2.5",cpcCSA:"1.5",breakerRating:"6",isRing:false},
+    {description:"EV Charger",wiringType:"Twin & Earth",refMethod:"C",points:"1",liveCSA:"6.0",cpcCSA:"2.5",breakerRating:"32",isRing:false},
+  ]},
+  domestic_split_6: { name: "6-Way MCB Split Load", boardType: "mcb_split", circuits: [
+    {description:"Lighting",wiringType:"Twin & Earth",refMethod:"C",points:"8",liveCSA:"1.5",cpcCSA:"1.0",breakerRating:"6",isRing:false},
+    {description:"Ring Final - Sockets",wiringType:"Twin & Earth",refMethod:"C",points:"12",liveCSA:"2.5",cpcCSA:"1.5",breakerRating:"32",isRing:true},
+    {description:"Cooker",wiringType:"Twin & Earth",refMethod:"C",points:"1",liveCSA:"6.0",cpcCSA:"2.5",breakerRating:"32",isRing:false},
+    {description:"Shower",wiringType:"Twin & Earth",refMethod:"C",points:"1",liveCSA:"10.0",cpcCSA:"4.0",breakerRating:"40",isRing:false},
+    {description:"Smoke Alarms",wiringType:"Twin & Earth",refMethod:"C",points:"4",liveCSA:"1.5",cpcCSA:"1.0",breakerRating:"6",isRing:false},
+    {description:"Immersion Heater",wiringType:"Twin & Earth",refMethod:"C",points:"1",liveCSA:"2.5",cpcCSA:"1.5",breakerRating:"16",isRing:false},
+  ]},
+};
+
+// ─── State ─────────────────────────────────────────────────────────────────
+
+let state = {
+  step: 0, certType: null, showVal: false, draftId: null,
+  clientName: "", clientAddress: "", clientTown: "", clientPostcode: "", clientPhone: "",
+  installAddress: "", installSame: true, dateOfWork: new Date().toISOString().split("T")[0],
+  installationType: "", description: "", boardType: "rcbo",
+  ze: "", pfc: "",
+  overallAssessment: "", observations: [],
+  circuits: [blankCircuit()],
+  selectedTemplate: null,
+  expandedCircuit: 0,
+};
+
+function blankCircuit() {
+  return { description:"",wiringType:"",refMethod:"",points:"",liveCSA:"",cpcCSA:"",breakerType:"",breakerRating:"",isRing:false,ringLL:"",ringNN:"",ringEE:"",r1r2:"",irLiveL:"",irLiveE:"",rcdTrip:"" };
+}
+
+function blankObs() { return { code:"", location:"", observation:"" }; }
+
+function set(updates) { Object.assign(state, updates); render(); }
+
+// Silent update — saves value to state WITHOUT re-rendering (no focus loss)
+function s(field, val) { state[field] = val; }
+function sc(idx, field, val) { state.circuits[idx][field] = val; }
+function so(idx, field, val) { state.observations[idx][field] = val; }
+
+// ─── Draft System (localStorage) ────────────────────────────────────────────
+
+function generateDraftId() { return Date.now().toString(); }
+
+function saveDraft() {
+  if (!state.certType) return; // Need at least a cert type selected
+  if (state.step === 0) return; // Don't auto-save on step 0
+
+  if (!state.draftId) {
+    state.draftId = generateDraftId();
+  }
+
+  const drafts = getDrafts();
+  const existing = drafts[state.draftId];
+  const draftData = {
+    id: state.draftId,
+    certType: state.certType,
+    clientName: state.clientName || "Untitled",
+    dateStarted: existing ? existing.dateStarted : new Date().toISOString(),
+    lastModified: new Date().toISOString(),
+    step: state.step,
+    state: JSON.parse(JSON.stringify(state))
+  };
+
+  drafts[state.draftId] = draftData;
+
+  // Keep max 20 drafts
+  const draftIds = Object.keys(drafts).sort((a, b) => parseInt(b) - parseInt(a));
+  if (draftIds.length > 20) {
+    delete drafts[draftIds[draftIds.length - 1]];
+  }
+
+  try { localStorage.setItem('efix_drafts', JSON.stringify(drafts)); } catch(e) {}
+  showToast("Draft saved");
+}
+
+function getDrafts() {
+  try {
+    const stored = localStorage.getItem('efix_drafts');
+    return stored ? JSON.parse(stored) : {};
+  } catch(e) { return {}; }
+}
+
+function loadDraft(draftId) {
+  const drafts = getDrafts();
+  const draft = drafts[draftId];
+  if (!draft) return;
+
+  state = JSON.parse(JSON.stringify(draft.state));
+  render();
+}
+
+function deleteDraft(draftId) {
+  const drafts = getDrafts();
+  delete drafts[draftId];
+  try { localStorage.setItem('efix_drafts', JSON.stringify(drafts)); } catch(e) {}
+  if (state.draftId === draftId) {
+    state.draftId = null;
+  }
+  render();
+}
+
+function clearAllDrafts() {
+  if (confirm("Delete all saved drafts? This cannot be undone.")) {
+    try { localStorage.removeItem('efix_drafts'); } catch(e) {}
+    state.draftId = null;
+    render();
+  }
+}
+
+let autoSaveTimer = null;
+
+function setupAutoSave() {
+  if (state.step > 0) {
+    if (autoSaveTimer) clearInterval(autoSaveTimer);
+    autoSaveTimer = setInterval(() => {
+      if (state.step > 0) saveDraft();
+    }, 10000);
+  }
+}
+
+// ─── Postcode Lookup ───────────────────────────────────────────────────────
+
+let pcLoading = false;
+let pcMsg = "";
+let pcMsgErr = false;
+let pcAreaInfo = "";
+
+async function lookupPostcode(target) {
+  const pc = target === "client" ? state.clientPostcode : state.installAddress;
+  if (!pc || pc.replace(/\s/g,"").length < 5) {
+    pcMsg = "Enter a full postcode first"; pcMsgErr = true; pcAreaInfo = ""; render(); return;
+  }
+  pcLoading = true; pcMsg = "Looking up..."; pcMsgErr = false; pcAreaInfo = ""; render();
+  try {
+    const resp = await fetch("https://api.postcodes.io/postcodes/" + encodeURIComponent(pc.trim()));
+    if (!resp.ok) { pcMsg = "Postcode not found — check and retry"; pcMsgErr = true; pcLoading = false; render(); return; }
+    const data = await resp.json();
+    if (data.status === 200 && data.result) {
+      const r = data.result;
+      const town = r.admin_district || r.admin_county || "";
+      const ward = r.admin_ward || "";
+      const parish = r.parish || "";
+      pcLoading = false;
+      if (target === "client") {
+        state.clientTown = town;
+        state.clientPostcode = r.postcode; // formatted version
+      }
+      pcAreaInfo = [ward, parish].filter(Boolean).join(" · ");
+      pcMsg = "Town auto-filled: " + town;
+      pcMsgErr = false;
+      render();
+    } else {
+      pcMsg = "Postcode not found"; pcMsgErr = true; pcLoading = false; render();
+    }
+  } catch (e) {
+    pcMsg = "No signal — enter address manually"; pcMsgErr = true; pcLoading = false; render();
+  }
+}
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.className = "toast show";
+  setTimeout(() => t.className = "toast", 2000);
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
+
+function opts(arr, placeholder) {
+  return `<option value="">${placeholder||"Select"}</option>` + arr.map(v => `<option value="${v}">${v}</option>`).join("");
+}
+
+function optsWithSuffix(arr, suffix, placeholder) {
+  return `<option value="">${placeholder||"Select"}</option>` + arr.map(v => `<option value="${v}">${v}${suffix}</option>`).join("");
+}
+
+function toggle(id, on, label) {
+  return `<div class="toggle-wrap">
+    <div class="toggle ${on?'on':'off'}" onclick="toggleField('${id}')"><div class="toggle-dot"></div></div>
+    <span class="toggle-label">${label}</span>
+  </div>`;
+}
+
+// ─── Combo-box (circuit name picker) ─────────────────────────────────────
+
+function openCombo(idx) {
+  const list = document.getElementById('combo-list-'+idx);
+  if (!list) return;
+  filterCombo(idx, '');
+  list.classList.add('open');
+}
+
+function closeCombo(idx) {
+  // Small delay so tap on item registers before list hides
+  setTimeout(() => {
+    const list = document.getElementById('combo-list-'+idx);
+    if (list) list.classList.remove('open');
+  }, 200);
+}
+
+function filterCombo(idx, val) {
+  const list = document.getElementById('combo-list-'+idx);
+  if (!list) return;
+  const q = val.toLowerCase();
+  const filtered = q ? CIRCUIT_NAMES.filter(n => n.toLowerCase().includes(q)) : CIRCUIT_NAMES;
+  list.innerHTML = filtered.map(n =>
+    `<div class="combo-item" onmousedown="pickCombo(${idx},'${n.replace(/'/g,"\\'")}')">${n}</div>`
+  ).join('');
+  if (filtered.length === 0 && q) {
+    list.innerHTML = '<div style="padding:10px 12px;font-size:13px;color:#94a3b8">No match — custom name OK</div>';
+  }
+  list.classList.add('open');
+}
+
+function pickCombo(idx, val) {
+  state.circuits[idx].description = val;
+  const input = document.getElementById('combo-input-'+idx);
+  if (input) input.value = val;
+  const list = document.getElementById('combo-list-'+idx);
+  if (list) list.classList.remove('open');
+}
+
+function certColor() { return state.certType === 'eicr' ? '#16a34a' : '#dc2626'; }
+function certLabel() { return state.certType === 'minor' ? 'Minor Works' : state.certType === 'eic' ? 'EIC' : 'EICR'; }
+
+function renderLogoSVG() {
+  return `<svg class="logo-svg" viewBox="0 0 160 90" xmlns="http://www.w3.org/2000/svg">
+    <!-- E-FIX text -->
+    <text x="10" y="40" font-size="32" font-weight="bold" fill="#1e293b">E-FIX</text>
+    <!-- Lightning bolt -->
+    <path d="M 110 15 L 120 35 L 105 35 L 125 65 L 100 45 L 115 45 Z" fill="#16a34a"/>
+    <!-- ELECTRICAL text -->
+    <text x="10" y="70" font-size="11" font-weight="600" fill="#16a34a" letter-spacing="1.5">ELECTRICAL</text>
+    <!-- Line underneath -->
+    <line x1="10" y1="75" x2="140" y2="75" stroke="#1e293b" stroke-width="1.5"/>
+  </svg>`;
+}
+
+// ─── Render ────────────────────────────────────────────────────────────────
+
+function render() {
+  const app = document.getElementById("app");
+  if (state.step === 0) app.innerHTML = renderStep0();
+  else if (state.step === 1) app.innerHTML = renderStep1();
+  else if (state.step === 2) app.innerHTML = renderStep2();
+  else if (state.step === 3) app.innerHTML = renderStep3();
+  restoreValues();
+  setupAutoSave();
+}
+
+function restoreValues() {
+  // Restore select/input values after innerHTML
+  document.querySelectorAll("[data-field]").forEach(el => {
+    const f = el.dataset.field;
+    const idx = el.dataset.idx;
+    let val;
+    if (idx !== undefined && f.startsWith("obs_")) {
+      val = state.observations[idx]?.[f.replace("obs_","")];
+    } else if (idx !== undefined) {
+      val = state.circuits[idx]?.[f];
+    } else {
+      val = state[f];
+    }
+    if (val !== undefined) el.value = val;
+  });
+}
+
+// ─── Step 0: Cert Type ─────────────────────────────────────────────────────
+
+function renderStep0() {
+  const types = [
+    { id:"minor", label:"Minor Works", color:"#dc2626", desc:"Single circuit / small job" },
+    { id:"eic", label:"EIC", color:"#dc2626", desc:"New installation certificate" },
+    { id:"eicr", label:"EICR", color:"#16a34a", desc:"Condition report" },
+  ];
+  const drafts = getDrafts();
+  const hasDrafts = Object.keys(drafts).length > 0;
+
+  return `
+    <div class="header">
+      ${renderLogoSVG()}
+      <div class="subtitle">NICEIC Certificate Data Entry</div>
+    </div>
+    <div class="section-title" style="margin-top:8px">Select Certificate Type</div>
+    ${types.map(t => `
+      <div class="cert-card${state.certType===t.id?(t.id==='eicr'?' sel-green':' sel'):''}"
+        style="border-color:${state.certType===t.id?t.color:'#e2e8f0'}"
+        onclick="set({certType:'${t.id}'})">
+        <div class="cert-label" style="color:${t.color}">
+          <span class="dot" style="background:${t.color}"></span>${t.label}
+        </div>
+        <div class="cert-desc">${t.desc}</div>
+      </div>
+    `).join("")}
+    ${state.certType ? `<button class="btn btn-blue" onclick="startNewSession()">Next →</button>` : ""}
+
+    ${hasDrafts ? `
+    <div class="drafts-section">
+      <div class="divider" style="margin:16px 0"></div>
+      <div class="drafts-header">
+        <div class="section-title" style="margin-bottom:0">Saved Drafts</div>
+        <button class="clear-all-btn" onclick="clearAllDrafts()">Clear All</button>
+      </div>
+      ${Object.values(drafts).sort((a,b) => parseInt(b.id) - parseInt(a.id)).map(draft => {
+        const certColor = draft.certType === 'eicr' ? '#16a34a' : '#dc2626';
+        const certLabel = draft.certType === 'minor' ? 'Minor Works' : draft.certType === 'eic' ? 'EIC' : 'EICR';
+        const startDate = new Date(draft.dateStarted).toLocaleDateString();
+        const modDate = new Date(draft.lastModified).toLocaleDateString();
+        return `
+          <div class="draft-card" onclick="loadDraft('${draft.id}')">
+            <div class="draft-info">
+              <div class="draft-name">${draft.clientName}</div>
+              <div class="draft-meta">
+                <span class="draft-badge" style="background:${certColor}">${certLabel}</span>
+                Started: ${startDate} | Modified: ${modDate}
+              </div>
+            </div>
+            <button class="draft-delete" onclick="event.stopPropagation();deleteDraft('${draft.id}')">×</button>
+          </div>
+        `;
+      }).join("")}
+    </div>` : ''}
+  `;
+}
+
+function startNewSession() {
+  state.draftId = generateDraftId();
+  set({step:1, showVal:false});
+}
+
+// ─── Step 1: Job Details ───────────────────────────────────────────────────
+
+function renderStep1() {
+  const s = state, v = s.showVal;
+  const eicr = s.certType === "eicr";
+  return `
+    <div class="header">
+      <div class="logo">Job Details</div>
+      <div class="subtitle">${certLabel()} <span class="badge" style="background:${certColor()}">${s.certType.toUpperCase()}</span></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Client</div>
+      <div class="field"><label>Client Name *</label>
+        <input ${v&&!s.clientName?'class="err"':''} data-field="clientName" oninput="s('clientName',this.value)" placeholder="Full name"></div>
+      <div class="field"><label>Postcode * — tap Lookup to auto-fill town</label>
+        <div class="pc-row">
+          <input ${v&&!s.clientPostcode?'class="err"':''} data-field="clientPostcode" oninput="s('clientPostcode',this.value)" placeholder="DE1 1AA" style="text-transform:uppercase">
+          <button class="btn-sm" style="background:var(--blue);color:#fff;white-space:nowrap" onclick="lookupPostcode('client')">${pcLoading?'...':'Lookup'}</button>
+        </div>
+      </div>
+      ${pcMsg ? `<div class="pc-status${pcMsgErr?' error':''}">${pcMsg}</div>` : ''}
+      ${pcAreaInfo ? `<div class="pc-status" style="color:var(--blue);font-weight:600">${pcAreaInfo}</div>` : ''}
+      <div class="field"><label>Address</label>
+        <input data-field="clientAddress" oninput="s('clientAddress',this.value)" placeholder="Street address (e.g. 75 Reigate Drive)"></div>
+      <div class="field"><label>Town</label>
+        <input data-field="clientTown" oninput="s('clientTown',this.value)" placeholder="Auto-filled by postcode lookup"></div>
+      <div class="field"><label>Phone</label>
+        <input type="tel" inputmode="tel" data-field="clientPhone" oninput="s('clientPhone',this.value)" placeholder="07..."></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Installation</div>
+      ${toggle('installSame', s.installSame, 'Same address as client')}
+      ${!s.installSame ? `<div class="field" style="margin-top:10px"><label>Installation Address *</label>
+        <input ${v&&!s.installSame&&!s.installAddress?'class="err"':''} data-field="installAddress" oninput="s('installAddress',this.value)" placeholder="Full installation address"></div>` : ''}
+      <div class="field" style="margin-top:10px"><label>Date of Work *</label>
+        <input type="date" data-field="dateOfWork" oninput="s('dateOfWork',this.value)"></div>
+      <div class="field"><label>Installation Type</label>
+        <select data-field="installationType" onchange="set({installationType:this.value})">${opts(INSTALL_TYPES)}</select></div>
+      <div class="field"><label>Description of Work</label>
+        <input data-field="description" oninput="s('description',this.value)" placeholder="${eicr?'e.g. Periodic inspection & testing':s.certType==='minor'?'e.g. Install additional socket outlet':'e.g. New consumer unit and full rewire'}"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Supply Characteristics</div>
+      <div class="row">
+        <div><label>Ze (Ω)</label><input inputmode="decimal" data-field="ze" oninput="s('ze',this.value)" placeholder="e.g. 0.35"></div>
+        <div><label>PFC (kA)</label><input inputmode="decimal" data-field="pfc" oninput="s('pfc',this.value)" placeholder="e.g. 1.2"></div>
+      </div>
+    </div>
+
+    ${eicr ? renderEICRSection() : ''}
+
+    <div class="btn-row">
+      <button class="btn btn-grey" onclick="saveDraft();set({step:0})">← Back</button>
+      <button class="btn btn-blue" onclick="validateStep1()">Next →</button>
+    </div>
+  `;
+}
+
+function renderEICRSection() {
+  const s = state;
+  return `
+    <div class="section">
+      <div class="section-title">EICR Assessment</div>
+      <div class="field"><label>Overall Assessment</label>
+        <div class="row">
+          <button class="assess-btn" style="background:${s.overallAssessment==='Satisfactory'?'#16a34a':'#f1f5f9'};color:${s.overallAssessment==='Satisfactory'?'#fff':'#475569'}" onclick="set({overallAssessment:'Satisfactory'})">Satisfactory</button>
+          <button class="assess-btn" style="background:${s.overallAssessment==='Unsatisfactory'?'#dc2626':'#f1f5f9'};color:${s.overallAssessment==='Unsatisfactory'?'#fff':'#475569'}" onclick="set({overallAssessment:'Unsatisfactory'})">Unsatisfactory</button>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:12px;font-weight:700;color:#475569">OBSERVATIONS</span>
+        <button class="btn-sm add-btn" onclick="addObs()">+ Add</button>
+      </div>
+      ${s.observations.map((o,i) => `
+        <div class="obs-card">
+          <div class="row">
+            <div style="width:80px"><label>Code</label>
+              <select data-field="obs_code" data-idx="${i}" onchange="updateObs(${i},'code',this.value)">
+                <option value="">--</option>${OBS_CODES.map(c=>`<option value="${c}">${c}</option>`).join("")}
+              </select></div>
+            <div><label>Location</label>
+              <input data-field="obs_location" data-idx="${i}" oninput="so(${i},'location',this.value)" placeholder="e.g. Kitchen"></div>
+          </div>
+          <div class="field"><label>Observation</label>
+            <input data-field="obs_observation" data-idx="${i}" oninput="so(${i},'observation',this.value)" placeholder="e.g. No RCD protection to socket outlets"></div>
+          <div style="text-align:right"><button class="btn-sm remove-btn" onclick="removeObs(${i})">Remove</button></div>
+        </div>
+      `).join("")}
+      ${s.observations.length===0?'<div class="empty-msg">No observations yet — tap + Add</div>':''}
+    </div>
+  `;
+}
+
+// ─── Step 2: Circuits ──────────────────────────────────────────────────────
+
+function renderStep2() {
+  const s = state, isMinor = s.certType === 'minor';
+  return `
+    <div class="header">
+      <div class="logo">${isMinor?'Circuit Details':'Circuit Schedule'}</div>
+      <div class="subtitle">${s.clientName} — ${certLabel()}</div>
+    </div>
+
+    ${!isMinor ? `
+    <div class="section">
+      <div class="section-title">Board Type</div>
+      <div style="display:flex;gap:6px">
+        <button class="board-btn${s.boardType==='rcbo'?' sel':''}" onclick="set({boardType:'rcbo'})">RCBO</button>
+        <button class="board-btn${s.boardType==='mcb_split'?' sel':''}" onclick="set({boardType:'mcb_split'})">MCB Split</button>
+        <button class="board-btn${s.boardType==='mcb_rcd'?' sel':''}" onclick="set({boardType:'mcb_rcd'})">MCB+RCD</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Quick Templates</div>
+      ${Object.entries(TEMPLATES).map(([k,t]) => `
+        <div class="tpl-card${s.selectedTemplate===k?' sel':''}" onclick="applyTemplate('${k}')">
+          <div class="tpl-label">${t.name}</div>
+          <div class="tpl-sub">${t.circuits.length} circuits — ${t.boardType.toUpperCase()}</div>
+        </div>
+      `).join("")}
+    </div>` : ''}
+
+    <div class="section">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="section-title" style="margin-bottom:0">Circuits (${s.circuits.length})</div>
+        ${s.circuits.length < 10 ? `<button class="btn-sm add-btn" onclick="addCircuit()">+ Add</button>` : ''}
+      </div>
+      ${s.circuits.map((c,i) => renderCircuit(c,i)).join("")}
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-grey" onclick="saveDraft();set({step:1})">← Back</button>
+      <button class="btn btn-blue" onclick="saveDraft();set({step:3})">Review →</button>
+    </div>
+  `;
+}
+
+function renderCircuit(c, i) {
+  const open = state.expandedCircuit === i;
+  const v = state.showVal;
+  return `
+    <div class="circuit-hdr${open?' open':''}" onclick="set({expandedCircuit:${open?-1:i}})">
+      <div style="display:flex;align-items:center">
+        <span class="circuit-num">C${i+1}</span>
+        <span class="circuit-desc">${c.description||'Tap to edit'}</span>
+      </div>
+      <span style="font-size:18px;color:#94a3b8">${open?'−':'+'}</span>
+    </div>
+    ${open ? `
+    <div class="circuit-body">
+      <div class="field"><label>Description * — tap to pick or type custom</label>
+        <div class="combo-wrap">
+          <input id="combo-input-${i}" ${v&&!c.description?'class="err"':''} data-field="description" data-idx="${i}"
+            oninput="sc(${i},'description',this.value);filterCombo(${i},this.value)"
+            onfocus="openCombo(${i})" onblur="closeCombo(${i})"
+            placeholder="e.g. Lighting, Cooker, Shower..." autocomplete="off">
+          <div class="combo-list" id="combo-list-${i}"></div>
+        </div>
+      </div>
+      <div class="row">
+        <div><label>Wiring Type *</label>
+          <select ${v&&!c.wiringType?'class="err"':''} data-field="wiringType" data-idx="${i}" onchange="sc(${i},'wiringType',this.value)">${opts(WIRING_TYPES)}</select></div>
+        <div><label>Ref Method *</label>
+          <select ${v&&!c.refMethod?'class="err"':''} data-field="refMethod" data-idx="${i}" onchange="sc(${i},'refMethod',this.value)">${opts(REF_METHODS)}</select></div>
+      </div>
+      <div class="row">
+        <div><label>Points</label>
+          <input type="number" inputmode="numeric" data-field="points" data-idx="${i}" oninput="sc(${i},'points',this.value)" placeholder="e.g. 8"></div>
+        <div><label>Live CSA *</label>
+          <select ${v&&!c.liveCSA?'class="err"':''} data-field="liveCSA" data-idx="${i}" onchange="sc(${i},'liveCSA',this.value)">${opts(CSA_SIZES,'mm²')}</select></div>
+        <div><label>CPC CSA *</label>
+          <select ${v&&!c.cpcCSA?'class="err"':''} data-field="cpcCSA" data-idx="${i}" onchange="sc(${i},'cpcCSA',this.value)">${opts(CSA_SIZES,'mm²')}</select></div>
+      </div>
+      <div class="row">
+        <div><label>Breaker Type</label>
+          <select data-field="breakerType" data-idx="${i}" onchange="sc(${i},'breakerType',this.value)">${opts(BREAKER_TYPES)}</select></div>
+        <div><label>Rating *</label>
+          <select ${v&&!c.breakerRating?'class="err"':''} data-field="breakerRating" data-idx="${i}" onchange="sc(${i},'breakerRating',this.value)">${optsWithSuffix(BREAKER_RATINGS,'A','Amps')}</select></div>
+      </div>
+      <div style="margin-bottom:10px">
+        ${toggle('ring_'+i, c.isRing, 'Ring Circuit')}
+      </div>
+      ${c.isRing ? `
+      <div class="row">
+        <div><label>Ring LL (Ω)</label><input inputmode="decimal" data-field="ringLL" data-idx="${i}" oninput="sc(${i},'ringLL',this.value)" placeholder="0.00"></div>
+        <div><label>Ring NN (Ω)</label><input inputmode="decimal" data-field="ringNN" data-idx="${i}" oninput="sc(${i},'ringNN',this.value)" placeholder="0.00"></div>
+        <div><label>Ring EE (Ω)</label><input inputmode="decimal" data-field="ringEE" data-idx="${i}" oninput="sc(${i},'ringEE',this.value)" placeholder="0.00"></div>
+      </div>` : ''}
+      <div class="divider"></div>
+      <div class="test-title">Test Results</div>
+      <div class="row">
+        <div><label>R1+R2 (Ω)</label><input inputmode="decimal" data-field="r1r2" data-idx="${i}" oninput="sc(${i},'r1r2',this.value)" placeholder="0.00"></div>
+        <div><label>IR L-L (MΩ)</label><input data-field="irLiveL" data-idx="${i}" oninput="sc(${i},'irLiveL',this.value)" placeholder=">999"></div>
+        <div><label>IR L-E (MΩ)</label><input data-field="irLiveE" data-idx="${i}" oninput="sc(${i},'irLiveE',this.value)" placeholder=">999"></div>
+      </div>
+      <div class="row">
+        <div><label>RCD Trip (ms)</label><input data-field="rcdTrip" data-idx="${i}" oninput="sc(${i},'rcdTrip',this.value)" placeholder="n/a"></div>
+        <div></div><div></div>
+      </div>
+      <div style="margin-top:8px;text-align:right">
+        ${state.circuits.length > 1 ? `<button class="btn-sm remove-btn" onclick="event.stopPropagation();removeCircuit(${i})">Remove Circuit</button>` : ''}
+      </div>
+    </div>` : ''}
+  `;
+}
+
+// ─── Step 3: Review & Export ───────────────────────────────────────────────
+
+function renderStep3() {
+  const s = state;
+  const filled = s.circuits.filter(c => c.description);
+  return `
+    <div class="header">
+      <div class="logo">Review & Export</div>
+      <div class="subtitle">${s.clientName} — ${certLabel()}</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Job Summary</div>
+      <div class="summary-line">
+        <div><strong>Type:</strong> ${certLabel()} <span class="badge" style="background:${certColor()}">${s.certType.toUpperCase()}</span></div>
+        <div><strong>Client:</strong> ${s.clientName}</div>
+        <div><strong>Address:</strong> ${s.clientAddress}${s.clientTown?', '+s.clientTown:''} ${s.clientPostcode}</div>
+        ${s.clientPhone?`<div><strong>Phone:</strong> ${s.clientPhone}</div>`:''}
+        <div><strong>Date:</strong> ${s.dateOfWork}</div>
+        ${s.installationType?`<div><strong>Type:</strong> ${s.installationType}</div>`:''}
+        ${s.description?`<div><strong>Work:</strong> ${s.description}</div>`:''}
+        ${s.certType!=='minor'?`<div><strong>Board:</strong> ${s.boardType.toUpperCase()}</div>`:''}
+        ${s.ze?`<div><strong>Ze:</strong> ${s.ze}Ω</div>`:''}
+        ${s.pfc?`<div><strong>PFC:</strong> ${s.pfc}kA</div>`:''}
+        ${s.certType==='eicr'&&s.overallAssessment?`<div><strong>Assessment:</strong> <span style="color:${s.overallAssessment==='Satisfactory'?'#16a34a':'#dc2626'};font-weight:700">${s.overallAssessment}</span></div>`:''}
+      </div>
+    </div>
+
+    ${s.certType==='eicr'&&s.observations.length>0?`
+    <div class="section">
+      <div class="section-title">Observations (${s.observations.length})</div>
+      ${s.observations.map(o => {
+        const col = o.code==='C1'?'#dc2626':o.code==='C2'?'#f59e0b':o.code==='C3'?'#3b82f6':'#8b5cf6';
+        return `<div style="font-size:13px;margin-bottom:6px;color:#475569"><span class="badge" style="background:${col}">${o.code}</span> ${o.location?'<strong>'+o.location+':</strong> ':''}${o.observation}</div>`;
+      }).join("")}
+    </div>`:''}
+
+    <div class="section">
+      <div class="section-title">Circuits (${filled.length})</div>
+      ${filled.map((c,i) => `
+        <div class="circuit-summary">
+          <span class="circuit-num">C${i+1}</span>
+          <strong>${c.description}</strong> — ${c.wiringType}, ${c.liveCSA}mm², ${c.breakerType?c.breakerType+' ':''} ${c.breakerRating}A
+          ${c.isRing?'<span class="badge" style="background:#f59e0b">RING</span>':''}
+          ${c.r1r2?`<span style="margin-left:6px">R1+R2: ${c.r1r2}Ω</span>`:''}
+        </div>
+      `).join("")}
+    </div>
+
+    <div class="section">
+      <div class="section-title">Export</div>
+      <button class="btn btn-blue" style="margin-bottom:8px" onclick="copyToClipboard()">Copy to Clipboard</button>
+      <button class="btn btn-purple" style="margin-bottom:8px" onclick="downloadPDF()">Download PDF</button>
+      <button class="btn btn-dark" onclick="downloadJSON()">Download JSON File</button>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-grey" onclick="set({step:2})">← Edit Circuits</button>
+      <button class="btn btn-grey" onclick="startNew()">Start New</button>
+    </div>
+  `;
+}
+
+// ─── Actions ───────────────────────────────────────────────────────────────
+
+function toggleField(id) {
+  if (id === 'installSame') set({ installSame: !state.installSame });
+  else if (id.startsWith('ring_')) {
+    const i = parseInt(id.split('_')[1]);
+    state.circuits[i].isRing = !state.circuits[i].isRing;
+    render();
+  }
+}
+
+function validateStep1() {
+  saveDraft();
+  set({ step: 2, showVal: false });
+}
+
+function updateCircuit(i, field, val) { state.circuits[i][field] = val; }
+function updateObs(i, field, val) { state.observations[i][field] = val; }
+
+function addCircuit() {
+  if (state.circuits.length >= 10) { showToast("Max 10 circuits"); return; }
+  state.circuits.push(blankCircuit());
+  set({ expandedCircuit: state.circuits.length - 1 });
+}
+
+function removeCircuit(i) {
+  if (state.circuits.length <= 1) return;
+  state.circuits.splice(i, 1);
+  state.expandedCircuit = Math.min(state.expandedCircuit, state.circuits.length - 1);
+  render();
+}
+
+function addObs() { state.observations.push(blankObs()); render(); }
+function removeObs(i) { state.observations.splice(i, 1); render(); }
+
+function applyTemplate(key) {
+  const t = TEMPLATES[key];
+  state.selectedTemplate = key;
+  state.boardType = t.boardType;
+  state.circuits = t.circuits.map(c => Object.assign(blankCircuit(), c));
+  state.expandedCircuit = -1;
+  render();
+}
+
+function buildData() {
+  const s = state;
+  const data = {
+    certType: s.certType,
+    jobDetails: {
+      clientName: s.clientName, clientAddress: s.clientAddress, clientTown: s.clientTown,
+      clientPostcode: s.clientPostcode, clientPhone: s.clientPhone,
+      installationAddress: s.installSame ? "Same as client" : s.installAddress,
+      dateOfWork: s.dateOfWork, installationType: s.installationType,
+      description: s.description, boardType: s.boardType,
+    },
+    supplyCharacteristics: { ze: s.ze, pfc: s.pfc },
+    circuits: s.circuits.map((c, i) => ({ number: i + 1, ...c })),
+  };
+  if (s.certType === 'eicr') {
+    data.overallAssessment = s.overallAssessment;
+    data.observations = s.observations;
+  }
+  return data;
+}
+
+async function copyToClipboard() {
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(buildData(), null, 2));
+    showToast("Copied to clipboard!");
+  } catch { showToast("Copy failed — try download"); }
+}
+
+function downloadJSON() {
+  const blob = new Blob([JSON.stringify(buildData(), null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const ts = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `${state.certType}-${(state.clientName||'job').replace(/\s+/g,'_')}-${ts}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast("Downloaded!");
+}
+
+function downloadPDF() {
+  if (!window.jspdf && !window.jsPDF) {
+    showToast("Loading PDF library...");
+    const s = document.createElement('script');
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+    s.onload = () => downloadPDF();
+    s.onerror = () => showToast("PDF library failed to load — need internet");
+    document.head.appendChild(s);
+    return;
+  }
+  const jsPDF = window.jspdf?.jsPDF || window.jsPDF;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  let yPos = 10;
+  const lineHeight = 6;
+  const margins = { left: 10, right: 10 };
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const contentWidth = pageWidth - margins.left - margins.right;
+
+  // Header
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.text('E-Fix Electrical', pageWidth / 2, yPos, { align: 'center' });
+  yPos += lineHeight + 2;
+
+  doc.setFontSize(12);
+  doc.text('Certificate Data Extract', pageWidth / 2, yPos, { align: 'center' });
+  yPos += lineHeight + 4;
+
+  // Line separator
+  doc.setDrawColor(30, 41, 59);
+  doc.line(margins.left, yPos, pageWidth - margins.right, yPos);
+  yPos += 4;
+
+  // Job Summary
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('Job Summary', margins.left, yPos);
+  yPos += lineHeight;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+
+  const lines = [
+    `Certificate Type: ${certLabel()}`,
+    `Date: ${state.dateOfWork}`,
+    `Client: ${state.clientName}`,
+    `Address: ${state.clientAddress}${state.clientTown ? ', ' + state.clientTown : ''} ${state.clientPostcode}`,
+    ...(state.clientPhone ? [`Phone: ${state.clientPhone}`] : []),
+    ...(state.installationType ? [`Installation Type: ${state.installationType}`] : []),
+    ...(state.description ? [`Work Description: ${state.description}`] : []),
+    ...(state.certType !== 'minor' ? [`Board Type: ${state.boardType.toUpperCase()}`] : []),
+  ];
+
+  lines.forEach(line => {
+    doc.text(line, margins.left, yPos);
+    yPos += lineHeight;
+  });
+
+  yPos += 2;
+
+  // Supply Characteristics
+  if (state.ze || state.pfc) {
+    doc.setFont('helvetica', 'bold');
+    doc.text('Supply Characteristics', margins.left, yPos);
+    yPos += lineHeight;
+
+    doc.setFont('helvetica', 'normal');
+    if (state.ze) {
+      doc.text(`Ze: ${state.ze}Ω`, margins.left, yPos);
+      yPos += lineHeight;
+    }
+    if (state.pfc) {
+      doc.text(`PFC: ${state.pfc}kA`, margins.left, yPos);
+      yPos += lineHeight;
+    }
+    yPos += 2;
+  }
+
+  // EICR Assessment & Observations
+  if (state.certType === 'eicr') {
+    doc.setFont('helvetica', 'bold');
+    doc.text('Assessment & Observations', margins.left, yPos);
+    yPos += lineHeight;
+
+    doc.setFont('helvetica', 'normal');
+    if (state.overallAssessment) {
+      doc.text(`Overall Assessment: ${state.overallAssessment}`, margins.left, yPos);
+      yPos += lineHeight;
+    }
+
+    if (state.observations.length > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.text('Observations:', margins.left, yPos);
+      yPos += lineHeight - 1;
+
+      doc.setFont('helvetica', 'normal');
+      state.observations.forEach(obs => {
+        const obsText = `${obs.code || '-'} | ${obs.location || '-'}: ${obs.observation || '-'}`;
+        const wrapped = doc.splitTextToSize(obsText, contentWidth - 2);
+        wrapped.forEach(line => {
+          doc.text(line, margins.left + 1, yPos);
+          yPos += lineHeight - 2;
+        });
+      });
+    }
+    yPos += 2;
+  }
+
+  // Check if we need a new page
+  if (yPos > 200) {
+    doc.addPage();
+    yPos = 10;
+  }
+
+  // Circuit Schedule
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('Circuit Schedule', margins.left, yPos);
+  yPos += lineHeight + 2;
+
+  // Table headers
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+
+  const cols = { c: margins.left, desc: 20, wire: 42, csa: 58, breaker: 73, test: 90 };
+  doc.text('C#', cols.c, yPos);
+  doc.text('Description', cols.desc, yPos);
+  doc.text('Wiring', cols.wire, yPos);
+  doc.text('CSA', cols.csa, yPos);
+  doc.text('Breaker', cols.breaker, yPos);
+  doc.text('R1+R2', cols.test, yPos);
+  yPos += lineHeight;
+
+  // Table rows
+  doc.setFont('helvetica', 'normal');
+  const filled = state.circuits.filter(c => c.description);
+  filled.forEach((c, i) => {
+    const circNum = `C${i + 1}`;
+    const desc = c.description.substring(0, 12);
+    const wire = c.wiringType.substring(0, 8);
+    const csa = `${c.liveCSA}/${c.cpcCSA}`;
+    const breaker = `${c.breakerRating}A`;
+    const r1r2 = c.r1r2 || '-';
+
+    doc.text(circNum, cols.c, yPos);
+    doc.text(desc, cols.desc, yPos);
+    doc.text(wire, cols.wire, yPos);
+    doc.text(csa, cols.csa, yPos);
+    doc.text(breaker, cols.breaker, yPos);
+    doc.text(r1r2, cols.test, yPos);
+    yPos += lineHeight;
+
+    if (yPos > 250) {
+      doc.addPage();
+      yPos = 10;
+    }
+  });
+
+  yPos += 4;
+
+  // Footer
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(8);
+  doc.text(`Generated by E-Fix Data Collector on ${new Date().toLocaleString()}`, pageWidth / 2, pageWidth - 10, { align: 'center' });
+
+  // Download
+  const ts = new Date().toISOString().slice(0, 10);
+  doc.save(`efix-${state.certType}-${(state.clientName || 'job').replace(/\s+/g, '_')}-${ts}.pdf`);
+  showToast("PDF downloaded!");
+}
+
+function startNew() {
+  if (confirm("Start a new certificate? Current draft will be saved.")) {
+    saveDraft();
+    state = {
+      step:0, certType:null, showVal:false, draftId: null,
+      clientName:"", clientAddress:"", clientTown:"", clientPostcode:"", clientPhone:"",
+      installAddress:"", installSame:true, dateOfWork:new Date().toISOString().split("T")[0],
+      installationType:"", description:"", boardType:"rcbo",
+      ze:"", pfc:"", overallAssessment:"", observations:[],
+      circuits:[blankCircuit()], selectedTemplate:null, expandedCircuit:0,
+    };
+    render();
+  }
+}
+
+// ─── Init ──────────────────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
