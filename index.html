@@ -37,6 +37,8 @@
   .cert-card { border: 2px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; cursor: pointer; background: #fff; transition: all 0.15s ease; }
   .cert-card.sel { background: #fef2f2; }
   .cert-card.sel-green { background: #f0fdf4; }
+  .cert-card.sel-amber { background: #fffbeb; }
+  .cert-card.sel-purple { background: #faf5ff; }
   .cert-label { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
   .cert-desc { font-size: 12px; color: var(--grey); margin-top: 2px; }
   .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
@@ -98,6 +100,13 @@
   .drafts-section { margin-bottom: 16px; }
   .drafts-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
   .clear-all-btn { background: none; border: none; color: #64748b; font-size: 12px; cursor: pointer; text-decoration: underline; }
+  .check-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+  .check-box { width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--border); background: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: all 0.15s; }
+  .check-box.checked { background: var(--blue); border-color: var(--blue); }
+  .check-box svg { display: none; }
+  .check-box.checked svg { display: block; }
+  .check-label { font-size: 14px; color: #475569; cursor: pointer; }
+  .check-label.checked { color: var(--dark); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -125,6 +134,39 @@ const CIRCUIT_NAMES = [
   "UFH (Underfloor Heating)","Spur","FCU (Fused Connection Unit)",
 ];
 const INSTALL_TYPES = ["New installation","Addition to existing installation","Alteration to existing installation"];
+
+// ─── Fire alarm data ──────────────────────────────────────────────────────
+const FIRE_DEVICE_TYPES = [
+  "Optical Smoke Detector","Ionisation Smoke Detector","Multi-sensor Detector",
+  "Heat Detector (Fixed)","Heat Detector (Rate of Rise)","CO Detector",
+  "Manual Call Point","Sounder","Sounder / Beacon","Visual Alarm Device (Beacon)",
+  "Interface Unit","Remote Indicator","Aspirating Detector","Line Detector","Duct Detector"
+];
+const FIRE_CATEGORIES = [
+  "L1 — Life (whole premises)","L2 — Life (escape + high risk)","L3 — Life (escape routes)",
+  "L4 — Life (circulation areas)","L5 — Life (localised)","M — Manual only",
+  "P1 — Property (whole)","P2 — Property (defined)",
+  "Grade A LD1","Grade A LD2","Grade A LD3",
+  "Grade C LD1","Grade C LD2","Grade C LD3",
+  "Grade D LD1","Grade D LD2","Grade D LD3","Grade F"
+];
+const FIRE_TEST_RESULT = ["Pass","Fault","Not tested"];
+const OK_FAULT = ["OK","Fault","N/A"];
+const FIRE_VISIT_TYPE = ["New installation / commissioning","Annual service","Six-monthly service","Quarterly service","Remedial visit","Weekly user test"];
+
+// ─── Emergency lighting data ──────────────────────────────────────────────
+const EMLIGHT_FITTING_TYPES = [
+  "LED Bulkhead (Maintained)","LED Bulkhead (Non-Maintained)","LED Downlight (Maintained)","LED Downlight (Non-Maintained)",
+  "LED Exit Sign (Maintained)","LED Exit Sign (Non-Maintained)","LED Twin Spot","LED Panel (Maintained)",
+  "Fluorescent (Maintained)","Fluorescent (Non-Maintained)","Self-contained LED","Slave Luminaire","Central Battery Fitting"
+];
+const EMLIGHT_DURATION = ["1 hour","3 hours"];
+const EMLIGHT_VISIT_TYPE = ["New installation / commissioning","Annual 3-hour test","Monthly function test","Six-monthly test","Remedial visit"];
+const EMLIGHT_SYSTEM_TYPE = ["Self-contained","Central battery","Mixed"];
+
+// ─── Checkbox CSS (injected once) ──────────────────────────────────────────
+// Added inline via style block above, but we define the toggle helper here
+
 const OBS_CODES = ["C1","C2","C3","FI"];
 
 const TEMPLATES = {
@@ -164,12 +206,20 @@ let state = {
   step: 0, certType: null, showVal: false, draftId: null,
   clientName: "", clientAddress: "", clientTown: "", clientPostcode: "", clientPhone: "",
   installAddress: "", installSame: true, dateOfWork: new Date().toISOString().split("T")[0],
-  installationType: "", description: "", boardType: "rcbo",
+  installationType: [], description: "", boardType: "rcbo",
   ze: "", pfc: "",
   overallAssessment: "", observations: [],
   circuits: [blankCircuit()],
   selectedTemplate: null,
   expandedCircuit: 0,
+  // Fire alarm
+  fireSystem: blankFireSystem(),
+  fireDevices: [blankFireDevice()],
+  expandedFireDevice: 0,
+  // Emergency lighting
+  emlightSystem: blankEmlightSystem(),
+  emlightFittings: [blankEmlightFitting()],
+  expandedEmlightFitting: 0,
 };
 
 function blankCircuit() {
@@ -178,12 +228,43 @@ function blankCircuit() {
 
 function blankObs() { return { code:"", location:"", observation:"" }; }
 
+function blankFireSystem() {
+  return {
+    visitType:"", category:"",
+    hasPanel:false, panelMake:"", panelModel:"", panelLocation:"",
+    cieStatus:"", cieNotes:"",
+    batteryVoltageResting:"", batteryVoltageUnderLoad:"", batteryStandbyOK:"", batteryNotes:"",
+    soundersTested:false, soundersResult:"",
+    overallVerdict:"", overallNotes:""
+  };
+}
+
+function blankFireDevice() {
+  return { ref:"", type:"", location:"", result:"", notes:"" };
+}
+
+function blankEmlightSystem() {
+  return {
+    visitType:"", systemType:"", duration:"",
+    testMethod:"", keySwitchLocation:"",
+    overallVerdict:"", overallNotes:""
+  };
+}
+
+function blankEmlightFitting() {
+  return { ref:"", type:"", location:"", duration:"", result:"", notes:"" };
+}
+
 function set(updates) { Object.assign(state, updates); render(); }
 
 // Silent update — saves value to state WITHOUT re-rendering (no focus loss)
 function s(field, val) { state[field] = val; }
 function sc(idx, field, val) { state.circuits[idx][field] = val; }
 function so(idx, field, val) { state.observations[idx][field] = val; }
+function sfs(field, val) { state.fireSystem[field] = val; }
+function sfd(idx, field, val) { state.fireDevices[idx][field] = val; }
+function ses(field, val) { state.emlightSystem[field] = val; }
+function sef(idx, field, val) { state.emlightFittings[idx][field] = val; }
 
 // ─── Draft System (localStorage) ────────────────────────────────────────────
 
@@ -234,6 +315,13 @@ function loadDraft(draftId) {
   if (!draft) return;
 
   state = JSON.parse(JSON.stringify(draft.state));
+  // Back-fill fields added in later versions (safety for older drafts)
+  if (!state.fireSystem) state.fireSystem = blankFireSystem();
+  if (!state.fireDevices || !state.fireDevices.length) state.fireDevices = [blankFireDevice()];
+  if (typeof state.expandedFireDevice !== 'number') state.expandedFireDevice = 0;
+  if (!state.emlightSystem) state.emlightSystem = blankEmlightSystem();
+  if (!state.emlightFittings || !state.emlightFittings.length) state.emlightFittings = [blankEmlightFitting()];
+  if (typeof state.expandedEmlightFitting !== 'number') state.expandedEmlightFitting = 0;
   render();
 }
 
@@ -367,8 +455,22 @@ function pickCombo(idx, val) {
   if (list) list.classList.remove('open');
 }
 
-function certColor() { return state.certType === 'eicr' ? '#16a34a' : '#dc2626'; }
-function certLabel() { return state.certType === 'minor' ? 'Minor Works' : state.certType === 'eic' ? 'EIC' : 'EICR'; }
+function certColor() {
+  const c = state.certType;
+  if (c === 'eicr') return '#16a34a';
+  if (c === 'fire') return '#f59e0b';
+  if (c === 'emlight') return '#8b5cf6';
+  return '#dc2626';
+}
+function certLabel() {
+  const c = state.certType;
+  if (c === 'minor') return 'Minor Works';
+  if (c === 'eic') return 'EIC';
+  if (c === 'eicr') return 'EICR';
+  if (c === 'fire') return 'Fire Alarm';
+  if (c === 'emlight') return 'Emergency Lighting';
+  return '';
+}
 
 function renderLogoSVG() {
   return `<svg class="logo-svg" viewBox="0 0 160 90" xmlns="http://www.w3.org/2000/svg">
@@ -389,7 +491,11 @@ function render() {
   const app = document.getElementById("app");
   if (state.step === 0) app.innerHTML = renderStep0();
   else if (state.step === 1) app.innerHTML = renderStep1();
-  else if (state.step === 2) app.innerHTML = renderStep2();
+  else if (state.step === 2) {
+    if (state.certType === 'fire')         app.innerHTML = renderStep2Fire();
+    else if (state.certType === 'emlight') app.innerHTML = renderStep2Emlight();
+    else                                   app.innerHTML = renderStep2();
+  }
   else if (state.step === 3) app.innerHTML = renderStep3();
   restoreValues();
   setupAutoSave();
@@ -400,8 +506,13 @@ function restoreValues() {
   document.querySelectorAll("[data-field]").forEach(el => {
     const f = el.dataset.field;
     const idx = el.dataset.idx;
+    const scope = el.dataset.scope;
     let val;
-    if (idx !== undefined && f.startsWith("obs_")) {
+    if (scope === 'fireSystem')       val = state.fireSystem?.[f];
+    else if (scope === 'fireDevice')  val = state.fireDevices?.[idx]?.[f];
+    else if (scope === 'emlightSystem')   val = state.emlightSystem?.[f];
+    else if (scope === 'emlightFitting')  val = state.emlightFittings?.[idx]?.[f];
+    else if (idx !== undefined && f.startsWith("obs_")) {
       val = state.observations[idx]?.[f.replace("obs_","")];
     } else if (idx !== undefined) {
       val = state.circuits[idx]?.[f];
@@ -419,6 +530,8 @@ function renderStep0() {
     { id:"minor", label:"Minor Works", color:"#dc2626", desc:"Single circuit / small job" },
     { id:"eic", label:"EIC", color:"#dc2626", desc:"New installation certificate" },
     { id:"eicr", label:"EICR", color:"#16a34a", desc:"Condition report" },
+    { id:"fire", label:"Fire Alarm", color:"#f59e0b", desc:"Fire alarm install / service" },
+    { id:"emlight", label:"Emergency Lighting", color:"#8b5cf6", desc:"Emergency lighting install / test" },
   ];
   const drafts = getDrafts();
   const hasDrafts = Object.keys(drafts).length > 0;
@@ -430,7 +543,7 @@ function renderStep0() {
     </div>
     <div class="section-title" style="margin-top:8px">Select Certificate Type</div>
     ${types.map(t => `
-      <div class="cert-card${state.certType===t.id?(t.id==='eicr'?' sel-green':' sel'):''}"
+      <div class="cert-card${state.certType===t.id?(t.id==='eicr'?' sel-green':t.id==='fire'?' sel-amber':t.id==='emlight'?' sel-purple':' sel'):''}"
         style="border-color:${state.certType===t.id?t.color:'#e2e8f0'}"
         onclick="set({certType:'${t.id}'})">
         <div class="cert-label" style="color:${t.color}">
@@ -449,8 +562,8 @@ function renderStep0() {
         <button class="clear-all-btn" onclick="clearAllDrafts()">Clear All</button>
       </div>
       ${Object.values(drafts).sort((a,b) => parseInt(b.id) - parseInt(a.id)).map(draft => {
-        const certColor = draft.certType === 'eicr' ? '#16a34a' : '#dc2626';
-        const certLabel = draft.certType === 'minor' ? 'Minor Works' : draft.certType === 'eic' ? 'EIC' : 'EICR';
+        const certColor = draft.certType === 'eicr' ? '#16a34a' : draft.certType === 'fire' ? '#f59e0b' : draft.certType === 'emlight' ? '#8b5cf6' : '#dc2626';
+        const certLabel = draft.certType === 'minor' ? 'Minor Works' : draft.certType === 'eic' ? 'EIC' : draft.certType === 'eicr' ? 'EICR' : draft.certType === 'fire' ? 'Fire Alarm' : draft.certType === 'emlight' ? 'Emergency Lighting' : '';
         const startDate = new Date(draft.dateStarted).toLocaleDateString();
         const modDate = new Date(draft.lastModified).toLocaleDateString();
         return `
@@ -480,6 +593,7 @@ function startNewSession() {
 function renderStep1() {
   const s = state, v = s.showVal;
   const eicr = s.certType === "eicr";
+  const isFireOrEm = s.certType === "fire" || s.certType === "emlight";
   return `
     <div class="header">
       <div class="logo">Job Details</div>
@@ -513,19 +627,26 @@ function renderStep1() {
         <input ${v&&!s.installSame&&!s.installAddress?'class="err"':''} data-field="installAddress" oninput="s('installAddress',this.value)" placeholder="Full installation address"></div>` : ''}
       <div class="field" style="margin-top:10px"><label>Date of Work *</label>
         <input type="date" data-field="dateOfWork" oninput="s('dateOfWork',this.value)"></div>
-      <div class="field"><label>Installation Type</label>
-        <select data-field="installationType" onchange="set({installationType:this.value})">${opts(INSTALL_TYPES)}</select></div>
+      ${!isFireOrEm ? `<div class="field"><label>Installation Type (tick all that apply)</label>
+        ${INSTALL_TYPES.map(t => {
+          const checked = Array.isArray(s.installationType) && s.installationType.includes(t);
+          return `<div class="check-row" onclick="toggleInstallType('${t}')">
+            <div class="check-box${checked?' checked':''}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></div>
+            <span class="check-label${checked?' checked':''}">${t}</span>
+          </div>`;
+        }).join("")}
+      </div>` : ''}
       <div class="field"><label>Description of Work</label>
-        <input data-field="description" oninput="s('description',this.value)" placeholder="${eicr?'e.g. Periodic inspection & testing':s.certType==='minor'?'e.g. Install additional socket outlet':'e.g. New consumer unit and full rewire'}"></div>
+        <input data-field="description" oninput="s('description',this.value)" placeholder="${eicr?'e.g. Periodic inspection & testing':s.certType==='minor'?'e.g. Install additional socket outlet':s.certType==='fire'?'e.g. Annual service of L2 fire alarm system':s.certType==='emlight'?'e.g. Annual 3-hour emergency lighting test':'e.g. New consumer unit and full rewire'}"></div>
     </div>
 
-    <div class="section">
+    ${!isFireOrEm ? `<div class="section">
       <div class="section-title">Supply Characteristics</div>
       <div class="row">
         <div><label>Ze (Ω)</label><input inputmode="decimal" data-field="ze" oninput="s('ze',this.value)" placeholder="e.g. 0.35"></div>
         <div><label>PFC (kA)</label><input inputmode="decimal" data-field="pfc" oninput="s('pfc',this.value)" placeholder="e.g. 1.2"></div>
       </div>
-    </div>
+    </div>` : ''}
 
     ${eicr ? renderEICRSection() : ''}
 
@@ -686,11 +807,246 @@ function renderCircuit(c, i) {
   `;
 }
 
+// ─── Step 2: Fire Alarm ─────────────────────────────────────────────────
+
+function renderStep2Fire() {
+  const s = state, fs = s.fireSystem;
+  return `
+    <div class="header">
+      <div class="logo">Fire Alarm System</div>
+      <div class="subtitle">${s.clientName} — ${certLabel()}</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Visit / System</div>
+      <div class="field"><label>Visit Type</label>
+        <select data-field="visitType" data-scope="fireSystem" onchange="sfs('visitType',this.value)">${opts(FIRE_VISIT_TYPE)}</select></div>
+      <div class="field"><label>System Category (BS 5839)</label>
+        <select data-field="category" data-scope="fireSystem" onchange="sfs('category',this.value)">${opts(FIRE_CATEGORIES)}</select></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Control &amp; Indicating Equipment</div>
+      ${toggle('hasPanel', fs.hasPanel, 'Fire panel present')}
+      ${fs.hasPanel ? `
+        <div class="row" style="margin-top:10px">
+          <div><label>Panel Make</label>
+            <input data-field="panelMake" data-scope="fireSystem" oninput="sfs('panelMake',this.value)" placeholder="e.g. Hochiki"></div>
+          <div><label>Panel Model</label>
+            <input data-field="panelModel" data-scope="fireSystem" oninput="sfs('panelModel',this.value)" placeholder="e.g. FireNET Plus"></div>
+        </div>
+        <div class="field"><label>Panel Location</label>
+          <input data-field="panelLocation" data-scope="fireSystem" oninput="sfs('panelLocation',this.value)" placeholder="e.g. Reception"></div>
+      ` : ''}
+      <div class="field" style="margin-top:10px"><label>CIE Status</label>
+        <select data-field="cieStatus" data-scope="fireSystem" onchange="sfs('cieStatus',this.value)">${opts(OK_FAULT)}</select></div>
+      <div class="field"><label>CIE Notes</label>
+        <input data-field="cieNotes" data-scope="fireSystem" oninput="sfs('cieNotes',this.value)" placeholder="e.g. Fault indicator on zone 3"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Backup Battery</div>
+      <div class="row">
+        <div><label>Resting V</label>
+          <input inputmode="decimal" data-field="batteryVoltageResting" data-scope="fireSystem" oninput="sfs('batteryVoltageResting',this.value)" placeholder="e.g. 26.8"></div>
+        <div><label>Under Load V</label>
+          <input inputmode="decimal" data-field="batteryVoltageUnderLoad" data-scope="fireSystem" oninput="sfs('batteryVoltageUnderLoad',this.value)" placeholder="e.g. 25.9"></div>
+      </div>
+      <div class="field"><label>Standby Duration</label>
+        <select data-field="batteryStandbyOK" data-scope="fireSystem" onchange="sfs('batteryStandbyOK',this.value)">${opts(OK_FAULT)}</select></div>
+      <div class="field"><label>Battery Notes</label>
+        <input data-field="batteryNotes" data-scope="fireSystem" oninput="sfs('batteryNotes',this.value)" placeholder="e.g. Batteries replaced 2024"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Sounders / Audibility</div>
+      ${toggle('fireSounders', fs.soundersTested, 'Sounders tested')}
+      ${fs.soundersTested ? `
+        <div class="field" style="margin-top:10px"><label>Result</label>
+          <select data-field="soundersResult" data-scope="fireSystem" onchange="sfs('soundersResult',this.value)">${opts(OK_FAULT)}</select></div>
+      ` : ''}
+    </div>
+
+    <div class="section">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="section-title" style="margin-bottom:0">Devices (${s.fireDevices.length})</div>
+        <button class="btn-sm add-btn" onclick="addFireDevice()">+ Add</button>
+      </div>
+      ${s.fireDevices.map((d,i) => renderFireDevice(d,i)).join("")}
+    </div>
+
+    <div class="section">
+      <div class="section-title">Overall Verdict</div>
+      <div class="field"><label>Assessment</label>
+        <div class="row">
+          <button class="assess-btn" style="background:${fs.overallVerdict==='Satisfactory'?'#16a34a':'#f1f5f9'};color:${fs.overallVerdict==='Satisfactory'?'#fff':'#475569'}" onclick="sfs('overallVerdict','Satisfactory');render()">Satisfactory</button>
+          <button class="assess-btn" style="background:${fs.overallVerdict==='Unsatisfactory'?'#dc2626':'#f1f5f9'};color:${fs.overallVerdict==='Unsatisfactory'?'#fff':'#475569'}" onclick="sfs('overallVerdict','Unsatisfactory');render()">Unsatisfactory</button>
+        </div>
+      </div>
+      <div class="field"><label>Overall Notes</label>
+        <input data-field="overallNotes" data-scope="fireSystem" oninput="sfs('overallNotes',this.value)" placeholder="e.g. Recommend full replacement within 12 months"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-grey" onclick="saveDraft();set({step:1})">← Back</button>
+      <button class="btn btn-blue" onclick="saveDraft();set({step:3})">Review →</button>
+    </div>
+  `;
+}
+
+function renderFireDevice(d, i) {
+  const open = state.expandedFireDevice === i;
+  return `
+    <div class="circuit-hdr${open?' open':''}" onclick="set({expandedFireDevice:${open?-1:i}})">
+      <div style="display:flex;align-items:center">
+        <span class="circuit-num">D${i+1}</span>
+        <span class="circuit-desc">${d.location ? d.location : 'Tap to edit'}${d.type?' — '+d.type.replace(/Detector/,'Det.'):''}</span>
+        ${d.result==='Pass'?'<span class="badge" style="background:#16a34a">PASS</span>':d.result==='Fault'?'<span class="badge" style="background:#dc2626">FAULT</span>':''}
+      </div>
+      <span style="font-size:18px;color:#94a3b8">${open?'−':'+'}</span>
+    </div>
+    ${open ? `
+    <div class="circuit-body">
+      <div class="row">
+        <div style="max-width:90px"><label>Ref</label>
+          <input data-field="ref" data-scope="fireDevice" data-idx="${i}" oninput="sfd(${i},'ref',this.value)" placeholder="#"></div>
+        <div><label>Type</label>
+          <select data-field="type" data-scope="fireDevice" data-idx="${i}" onchange="sfd(${i},'type',this.value)">${opts(FIRE_DEVICE_TYPES)}</select></div>
+      </div>
+      <div class="field"><label>Location</label>
+        <input data-field="location" data-scope="fireDevice" data-idx="${i}" oninput="sfd(${i},'location',this.value)" placeholder="e.g. Hallway, first floor"></div>
+      <div class="field"><label>Test Result</label>
+        <select data-field="result" data-scope="fireDevice" data-idx="${i}" onchange="sfd(${i},'result',this.value)">${opts(FIRE_TEST_RESULT)}</select></div>
+      <div class="field"><label>Notes / Fault Detail</label>
+        <input data-field="notes" data-scope="fireDevice" data-idx="${i}" oninput="sfd(${i},'notes',this.value)" placeholder="e.g. Head dirty, cleaned and retested"></div>
+      <div style="margin-top:8px;text-align:right">
+        ${state.fireDevices.length > 1 ? `<button class="btn-sm remove-btn" onclick="event.stopPropagation();removeFireDevice(${i})">Remove Device</button>` : ''}
+      </div>
+    </div>` : ''}
+  `;
+}
+
+function addFireDevice() {
+  state.fireDevices.push(blankFireDevice());
+  set({ expandedFireDevice: state.fireDevices.length - 1 });
+}
+function removeFireDevice(i) {
+  if (state.fireDevices.length <= 1) return;
+  state.fireDevices.splice(i, 1);
+  state.expandedFireDevice = Math.min(state.expandedFireDevice, state.fireDevices.length - 1);
+  render();
+}
+
+// ─── Step 2: Emergency Lighting ─────────────────────────────────────────
+
+function renderStep2Emlight() {
+  const s = state, es = s.emlightSystem;
+  return `
+    <div class="header">
+      <div class="logo">Emergency Lighting</div>
+      <div class="subtitle">${s.clientName} — ${certLabel()}</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Visit / System</div>
+      <div class="field"><label>Visit Type</label>
+        <select data-field="visitType" data-scope="emlightSystem" onchange="ses('visitType',this.value)">${opts(EMLIGHT_VISIT_TYPE)}</select></div>
+      <div class="field"><label>System Type</label>
+        <select data-field="systemType" data-scope="emlightSystem" onchange="ses('systemType',this.value)">${opts(EMLIGHT_SYSTEM_TYPE)}</select></div>
+      <div class="field"><label>Overall System Duration</label>
+        <select data-field="duration" data-scope="emlightSystem" onchange="ses('duration',this.value)">${opts(EMLIGHT_DURATION)}</select></div>
+      <div class="field"><label>Test Method</label>
+        <input data-field="testMethod" data-scope="emlightSystem" oninput="ses('testMethod',this.value)" placeholder="e.g. Key switch isolation"></div>
+      <div class="field"><label>Key-switch Location(s)</label>
+        <input data-field="keySwitchLocation" data-scope="emlightSystem" oninput="ses('keySwitchLocation',this.value)" placeholder="e.g. Next to DB, above door"></div>
+    </div>
+
+    <div class="section">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="section-title" style="margin-bottom:0">Fittings (${s.emlightFittings.length})</div>
+        <button class="btn-sm add-btn" onclick="addEmFitting()">+ Add</button>
+      </div>
+      ${s.emlightFittings.map((f,i) => renderEmFitting(f,i)).join("")}
+    </div>
+
+    <div class="section">
+      <div class="section-title">Overall Verdict</div>
+      <div class="field"><label>Assessment</label>
+        <div class="row">
+          <button class="assess-btn" style="background:${es.overallVerdict==='Satisfactory'?'#16a34a':'#f1f5f9'};color:${es.overallVerdict==='Satisfactory'?'#fff':'#475569'}" onclick="ses('overallVerdict','Satisfactory');render()">Satisfactory</button>
+          <button class="assess-btn" style="background:${es.overallVerdict==='Unsatisfactory'?'#dc2626':'#f1f5f9'};color:${es.overallVerdict==='Unsatisfactory'?'#fff':'#475569'}" onclick="ses('overallVerdict','Unsatisfactory');render()">Unsatisfactory</button>
+        </div>
+      </div>
+      <div class="field"><label>Overall Notes</label>
+        <input data-field="overallNotes" data-scope="emlightSystem" oninput="ses('overallNotes',this.value)" placeholder="e.g. Two fittings to be replaced next visit"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-grey" onclick="saveDraft();set({step:1})">← Back</button>
+      <button class="btn btn-blue" onclick="saveDraft();set({step:3})">Review →</button>
+    </div>
+  `;
+}
+
+function renderEmFitting(f, i) {
+  const open = state.expandedEmlightFitting === i;
+  return `
+    <div class="circuit-hdr${open?' open':''}" onclick="set({expandedEmlightFitting:${open?-1:i}})">
+      <div style="display:flex;align-items:center">
+        <span class="circuit-num">F${i+1}</span>
+        <span class="circuit-desc">${f.location ? f.location : 'Tap to edit'}${f.type?' — '+f.type:''}</span>
+        ${f.result==='Pass'?'<span class="badge" style="background:#16a34a">PASS</span>':f.result==='Fault'?'<span class="badge" style="background:#dc2626">FAULT</span>':''}
+      </div>
+      <span style="font-size:18px;color:#94a3b8">${open?'−':'+'}</span>
+    </div>
+    ${open ? `
+    <div class="circuit-body">
+      <div class="row">
+        <div style="max-width:90px"><label>Ref</label>
+          <input data-field="ref" data-scope="emlightFitting" data-idx="${i}" oninput="sef(${i},'ref',this.value)" placeholder="#"></div>
+        <div><label>Type</label>
+          <select data-field="type" data-scope="emlightFitting" data-idx="${i}" onchange="sef(${i},'type',this.value)">${opts(EMLIGHT_FITTING_TYPES)}</select></div>
+      </div>
+      <div class="field"><label>Location</label>
+        <input data-field="location" data-scope="emlightFitting" data-idx="${i}" oninput="sef(${i},'location',this.value)" placeholder="e.g. Above fire exit, ground floor"></div>
+      <div class="row">
+        <div><label>Duration</label>
+          <select data-field="duration" data-scope="emlightFitting" data-idx="${i}" onchange="sef(${i},'duration',this.value)">${opts(EMLIGHT_DURATION)}</select></div>
+        <div><label>Test Result</label>
+          <select data-field="result" data-scope="emlightFitting" data-idx="${i}" onchange="sef(${i},'result',this.value)">${opts(FIRE_TEST_RESULT)}</select></div>
+      </div>
+      <div class="field"><label>Notes / Fault Detail</label>
+        <input data-field="notes" data-scope="emlightFitting" data-idx="${i}" oninput="sef(${i},'notes',this.value)" placeholder="e.g. Battery replaced on site"></div>
+      <div style="margin-top:8px;text-align:right">
+        ${state.emlightFittings.length > 1 ? `<button class="btn-sm remove-btn" onclick="event.stopPropagation();removeEmFitting(${i})">Remove Fitting</button>` : ''}
+      </div>
+    </div>` : ''}
+  `;
+}
+
+function addEmFitting() {
+  state.emlightFittings.push(blankEmlightFitting());
+  set({ expandedEmlightFitting: state.emlightFittings.length - 1 });
+}
+function removeEmFitting(i) {
+  if (state.emlightFittings.length <= 1) return;
+  state.emlightFittings.splice(i, 1);
+  state.expandedEmlightFitting = Math.min(state.expandedEmlightFitting, state.emlightFittings.length - 1);
+  render();
+}
+
 // ─── Step 3: Review & Export ───────────────────────────────────────────────
 
 function renderStep3() {
   const s = state;
+  const isFire = s.certType === 'fire';
+  const isEm = s.certType === 'emlight';
+  const isElec = !isFire && !isEm;
   const filled = s.circuits.filter(c => c.description);
+  const fs = s.fireSystem || {};
+  const es = s.emlightSystem || {};
+  const fireDevs = (s.fireDevices || []).filter(d => d.location || d.type);
+  const emFits = (s.emlightFittings || []).filter(f => f.location || f.type);
   return `
     <div class="header">
       <div class="logo">Review & Export</div>
@@ -705,12 +1061,19 @@ function renderStep3() {
         <div><strong>Address:</strong> ${s.clientAddress}${s.clientTown?', '+s.clientTown:''} ${s.clientPostcode}</div>
         ${s.clientPhone?`<div><strong>Phone:</strong> ${s.clientPhone}</div>`:''}
         <div><strong>Date:</strong> ${s.dateOfWork}</div>
-        ${s.installationType?`<div><strong>Type:</strong> ${s.installationType}</div>`:''}
+        ${isElec && Array.isArray(s.installationType)&&s.installationType.length?`<div><strong>Type:</strong> ${s.installationType.join(', ')}</div>`:isElec && typeof s.installationType==='string'&&s.installationType?`<div><strong>Type:</strong> ${s.installationType}</div>`:''}
         ${s.description?`<div><strong>Work:</strong> ${s.description}</div>`:''}
-        ${s.certType!=='minor'?`<div><strong>Board:</strong> ${s.boardType.toUpperCase()}</div>`:''}
-        ${s.ze?`<div><strong>Ze:</strong> ${s.ze}Ω</div>`:''}
-        ${s.pfc?`<div><strong>PFC:</strong> ${s.pfc}kA</div>`:''}
+        ${isElec && s.certType!=='minor'?`<div><strong>Board:</strong> ${s.boardType.toUpperCase()}</div>`:''}
+        ${isElec && s.ze?`<div><strong>Ze:</strong> ${s.ze}Ω</div>`:''}
+        ${isElec && s.pfc?`<div><strong>PFC:</strong> ${s.pfc}kA</div>`:''}
         ${s.certType==='eicr'&&s.overallAssessment?`<div><strong>Assessment:</strong> <span style="color:${s.overallAssessment==='Satisfactory'?'#16a34a':'#dc2626'};font-weight:700">${s.overallAssessment}</span></div>`:''}
+        ${isFire && fs.visitType?`<div><strong>Visit:</strong> ${fs.visitType}</div>`:''}
+        ${isFire && fs.category?`<div><strong>Category:</strong> ${fs.category}</div>`:''}
+        ${isFire && fs.overallVerdict?`<div><strong>Verdict:</strong> <span style="color:${fs.overallVerdict==='Satisfactory'?'#16a34a':'#dc2626'};font-weight:700">${fs.overallVerdict}</span></div>`:''}
+        ${isEm && es.visitType?`<div><strong>Visit:</strong> ${es.visitType}</div>`:''}
+        ${isEm && es.systemType?`<div><strong>System:</strong> ${es.systemType}</div>`:''}
+        ${isEm && es.duration?`<div><strong>Duration:</strong> ${es.duration}</div>`:''}
+        ${isEm && es.overallVerdict?`<div><strong>Verdict:</strong> <span style="color:${es.overallVerdict==='Satisfactory'?'#16a34a':'#dc2626'};font-weight:700">${es.overallVerdict}</span></div>`:''}
       </div>
     </div>
 
@@ -723,7 +1086,53 @@ function renderStep3() {
       }).join("")}
     </div>`:''}
 
+    ${isFire ? `
     <div class="section">
+      <div class="section-title">System Status</div>
+      <div class="summary-line">
+        <div><strong>Panel:</strong> ${fs.hasPanel ? ((fs.panelMake||'?') + ' ' + (fs.panelModel||'') + (fs.panelLocation?' — '+fs.panelLocation:'')) : 'None'}</div>
+        ${fs.cieStatus?`<div><strong>CIE:</strong> ${fs.cieStatus}${fs.cieNotes?' — '+fs.cieNotes:''}</div>`:''}
+        ${(fs.batteryVoltageResting||fs.batteryVoltageUnderLoad)?`<div><strong>Battery:</strong> ${fs.batteryVoltageResting||'?'}V resting / ${fs.batteryVoltageUnderLoad||'?'}V under load${fs.batteryStandbyOK?' — standby '+fs.batteryStandbyOK:''}</div>`:''}
+        ${fs.soundersTested?`<div><strong>Sounders:</strong> ${fs.soundersResult||'tested'}</div>`:''}
+        ${fs.overallNotes?`<div><strong>Notes:</strong> ${fs.overallNotes}</div>`:''}
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">Devices (${fireDevs.length})</div>
+      ${fireDevs.map((d,i) => `
+        <div class="circuit-summary">
+          <span class="circuit-num">D${d.ref||i+1}</span>
+          <strong>${d.location||'(no location)'}</strong> — ${d.type||'?'}
+          ${d.result==='Pass'?'<span class="badge" style="background:#16a34a">PASS</span>':d.result==='Fault'?'<span class="badge" style="background:#dc2626">FAULT</span>':''}
+          ${d.notes?`<div style="font-size:12px;color:#64748b;margin-top:2px">${d.notes}</div>`:''}
+        </div>
+      `).join("")}
+      ${fireDevs.length===0?'<div class="empty-msg">No devices logged</div>':''}
+    </div>`:''}
+
+    ${isEm ? `
+    <div class="section">
+      <div class="section-title">System</div>
+      <div class="summary-line">
+        ${es.testMethod?`<div><strong>Test method:</strong> ${es.testMethod}</div>`:''}
+        ${es.keySwitchLocation?`<div><strong>Key switches:</strong> ${es.keySwitchLocation}</div>`:''}
+        ${es.overallNotes?`<div><strong>Notes:</strong> ${es.overallNotes}</div>`:''}
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">Fittings (${emFits.length})</div>
+      ${emFits.map((f,i) => `
+        <div class="circuit-summary">
+          <span class="circuit-num">F${f.ref||i+1}</span>
+          <strong>${f.location||'(no location)'}</strong> — ${f.type||'?'}${f.duration?' · '+f.duration:''}
+          ${f.result==='Pass'?'<span class="badge" style="background:#16a34a">PASS</span>':f.result==='Fault'?'<span class="badge" style="background:#dc2626">FAULT</span>':''}
+          ${f.notes?`<div style="font-size:12px;color:#64748b;margin-top:2px">${f.notes}</div>`:''}
+        </div>
+      `).join("")}
+      ${emFits.length===0?'<div class="empty-msg">No fittings logged</div>':''}
+    </div>`:''}
+
+    ${isElec ? `<div class="section">
       <div class="section-title">Circuits (${filled.length})</div>
       ${filled.map((c,i) => `
         <div class="circuit-summary">
@@ -733,7 +1142,7 @@ function renderStep3() {
           ${c.r1r2?`<span style="margin-left:6px">R1+R2: ${c.r1r2}Ω</span>`:''}
         </div>
       `).join("")}
-    </div>
+    </div>`:''}
 
     <div class="section">
       <div class="section-title">Export</div>
@@ -753,11 +1162,21 @@ function renderStep3() {
 
 function toggleField(id) {
   if (id === 'installSame') set({ installSame: !state.installSame });
+  else if (id === 'hasPanel') { state.fireSystem.hasPanel = !state.fireSystem.hasPanel; render(); }
+  else if (id === 'fireSounders') { state.fireSystem.soundersTested = !state.fireSystem.soundersTested; render(); }
   else if (id.startsWith('ring_')) {
     const i = parseInt(id.split('_')[1]);
     state.circuits[i].isRing = !state.circuits[i].isRing;
     render();
   }
+}
+
+function toggleInstallType(type) {
+  if (!Array.isArray(state.installationType)) state.installationType = [];
+  const idx = state.installationType.indexOf(type);
+  if (idx === -1) state.installationType.push(type);
+  else state.installationType.splice(idx, 1);
+  render();
 }
 
 function validateStep1() {
@@ -795,21 +1214,37 @@ function applyTemplate(key) {
 
 function buildData() {
   const s = state;
+  const isFire = s.certType === 'fire';
+  const isEm = s.certType === 'emlight';
+  const isElec = !isFire && !isEm;
+
   const data = {
     certType: s.certType,
     jobDetails: {
       clientName: s.clientName, clientAddress: s.clientAddress, clientTown: s.clientTown,
       clientPostcode: s.clientPostcode, clientPhone: s.clientPhone,
       installationAddress: s.installSame ? "Same as client" : s.installAddress,
-      dateOfWork: s.dateOfWork, installationType: s.installationType,
-      description: s.description, boardType: s.boardType,
+      dateOfWork: s.dateOfWork,
+      description: s.description,
+      ...(isElec ? { installationType: s.installationType, boardType: s.boardType } : {}),
     },
-    supplyCharacteristics: { ze: s.ze, pfc: s.pfc },
-    circuits: s.circuits.map((c, i) => ({ number: i + 1, ...c })),
   };
+
+  if (isElec) {
+    data.supplyCharacteristics = { ze: s.ze, pfc: s.pfc };
+    data.circuits = s.circuits.map((c, i) => ({ number: i + 1, ...c }));
+  }
   if (s.certType === 'eicr') {
     data.overallAssessment = s.overallAssessment;
     data.observations = s.observations;
+  }
+  if (isFire) {
+    data.fireSystem = s.fireSystem;
+    data.fireDevices = (s.fireDevices || []).map((d, i) => ({ number: i + 1, ...d }));
+  }
+  if (isEm) {
+    data.emlightSystem = s.emlightSystem;
+    data.emlightFittings = (s.emlightFittings || []).map((f, i) => ({ number: i + 1, ...f }));
   }
   return data;
 }
@@ -876,15 +1311,19 @@ function downloadPDF() {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
 
+  const isFireCT = state.certType === 'fire';
+  const isEmCT = state.certType === 'emlight';
+  const isElecCT = !isFireCT && !isEmCT;
+
   const lines = [
     `Certificate Type: ${certLabel()}`,
     `Date: ${state.dateOfWork}`,
     `Client: ${state.clientName}`,
     `Address: ${state.clientAddress}${state.clientTown ? ', ' + state.clientTown : ''} ${state.clientPostcode}`,
     ...(state.clientPhone ? [`Phone: ${state.clientPhone}`] : []),
-    ...(state.installationType ? [`Installation Type: ${state.installationType}`] : []),
+    ...(isElecCT && Array.isArray(state.installationType)&&state.installationType.length ? [`Installation Type: ${state.installationType.join(', ')}`] : isElecCT && typeof state.installationType==='string'&&state.installationType ? [`Installation Type: ${state.installationType}`] : []),
     ...(state.description ? [`Work Description: ${state.description}`] : []),
-    ...(state.certType !== 'minor' ? [`Board Type: ${state.boardType.toUpperCase()}`] : []),
+    ...(isElecCT && state.certType !== 'minor' ? [`Board Type: ${state.boardType.toUpperCase()}`] : []),
   ];
 
   lines.forEach(line => {
@@ -894,8 +1333,8 @@ function downloadPDF() {
 
   yPos += 2;
 
-  // Supply Characteristics
-  if (state.ze || state.pfc) {
+  // Supply Characteristics (electrical only)
+  if (isElecCT && (state.ze || state.pfc)) {
     doc.setFont('helvetica', 'bold');
     doc.text('Supply Characteristics', margins.left, yPos);
     yPos += lineHeight;
@@ -910,6 +1349,135 @@ function downloadPDF() {
       yPos += lineHeight;
     }
     yPos += 2;
+  }
+
+  // ─── Fire Alarm sections ───────────────────────────────────────────────
+  if (isFireCT) {
+    const fs = state.fireSystem || {};
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('Fire Alarm System', margins.left, yPos);
+    yPos += lineHeight;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    const fireLines = [
+      ...(fs.visitType ? [`Visit: ${fs.visitType}`] : []),
+      ...(fs.category ? [`Category: ${fs.category}`] : []),
+      `Fire Panel: ${fs.hasPanel ? 'Yes' : 'No'}`,
+      ...(fs.hasPanel && (fs.panelMake||fs.panelModel) ? [`Panel: ${fs.panelMake||''} ${fs.panelModel||''}${fs.panelLocation?' — '+fs.panelLocation:''}`.trim()] : []),
+      ...(fs.cieStatus ? [`CIE Status: ${fs.cieStatus}${fs.cieNotes?' — '+fs.cieNotes:''}`] : []),
+      ...((fs.batteryVoltageResting||fs.batteryVoltageUnderLoad) ? [`Backup Battery: resting ${fs.batteryVoltageResting||'-'}V, under load ${fs.batteryVoltageUnderLoad||'-'}V${fs.batteryStandbyOK?', standby '+fs.batteryStandbyOK:''}`] : []),
+      ...(fs.batteryNotes ? [`Battery Notes: ${fs.batteryNotes}`] : []),
+      ...(fs.soundersTested ? [`Sounders: tested — ${fs.soundersResult||'result not recorded'}`] : []),
+      ...(fs.overallVerdict ? [`Overall Verdict: ${fs.overallVerdict}`] : []),
+      ...(fs.overallNotes ? [`Notes: ${fs.overallNotes}`] : []),
+    ];
+    fireLines.forEach(line => {
+      const wrapped = doc.splitTextToSize(line, contentWidth);
+      wrapped.forEach(l => { doc.text(l, margins.left, yPos); yPos += lineHeight - 1; });
+    });
+    yPos += 2;
+
+    // Device table
+    const devices = (state.fireDevices || []).filter(d => d.location || d.type || d.ref);
+    if (devices.length > 0) {
+      if (yPos > 240) { doc.addPage(); yPos = 10; }
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text('Devices (' + devices.length + ')', margins.left, yPos);
+      yPos += lineHeight;
+
+      const dcol = { ref: margins.left, type: 25, loc: 78, res: 140, note: 160 };
+      doc.setFontSize(8);
+      doc.text('Ref',      dcol.ref,  yPos);
+      doc.text('Type',     dcol.type, yPos);
+      doc.text('Location', dcol.loc,  yPos);
+      doc.text('Result',   dcol.res,  yPos);
+      doc.text('Notes',    dcol.note, yPos);
+      doc.setDrawColor(180, 180, 180);
+      doc.line(margins.left, yPos + 1.5, pageWidth - margins.right, yPos + 1.5);
+      yPos += lineHeight;
+
+      doc.setFont('helvetica', 'normal');
+      devices.forEach((d, i) => {
+        if (yPos > 280) { doc.addPage(); yPos = 10; }
+        const type = (d.type||'-').length > 24 ? d.type.substring(0,22)+'…' : (d.type||'-');
+        const loc  = (d.location||'-').length > 28 ? d.location.substring(0,26)+'…' : (d.location||'-');
+        const note = (d.notes||'-').length > 30 ? d.notes.substring(0,28)+'…' : (d.notes||'-');
+        doc.text(String(d.ref || (i+1)), dcol.ref,  yPos);
+        doc.text(type, dcol.type, yPos);
+        doc.text(loc,  dcol.loc,  yPos);
+        doc.text(d.result || '-', dcol.res, yPos);
+        doc.text(note, dcol.note, yPos);
+        yPos += lineHeight - 1;
+      });
+      yPos += 2;
+    }
+  }
+
+  // ─── Emergency Lighting sections ───────────────────────────────────────
+  if (isEmCT) {
+    const es = state.emlightSystem || {};
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('Emergency Lighting System', margins.left, yPos);
+    yPos += lineHeight;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    const emLines = [
+      ...(es.visitType ? [`Visit: ${es.visitType}`] : []),
+      ...(es.systemType ? [`System Type: ${es.systemType}`] : []),
+      ...(es.duration ? [`Overall Duration: ${es.duration}`] : []),
+      ...(es.testMethod ? [`Test Method: ${es.testMethod}`] : []),
+      ...(es.keySwitchLocation ? [`Key Switch Location(s): ${es.keySwitchLocation}`] : []),
+      ...(es.overallVerdict ? [`Overall Verdict: ${es.overallVerdict}`] : []),
+      ...(es.overallNotes ? [`Notes: ${es.overallNotes}`] : []),
+    ];
+    emLines.forEach(line => {
+      const wrapped = doc.splitTextToSize(line, contentWidth);
+      wrapped.forEach(l => { doc.text(l, margins.left, yPos); yPos += lineHeight - 1; });
+    });
+    yPos += 2;
+
+    // Fittings table
+    const fittings = (state.emlightFittings || []).filter(f => f.location || f.type || f.ref);
+    if (fittings.length > 0) {
+      if (yPos > 240) { doc.addPage(); yPos = 10; }
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text('Fittings (' + fittings.length + ')', margins.left, yPos);
+      yPos += lineHeight;
+
+      const fcol = { ref: margins.left, type: 22, loc: 75, dur: 132, res: 150, note: 170 };
+      doc.setFontSize(8);
+      doc.text('Ref',      fcol.ref,  yPos);
+      doc.text('Type',     fcol.type, yPos);
+      doc.text('Location', fcol.loc,  yPos);
+      doc.text('Dur',      fcol.dur,  yPos);
+      doc.text('Result',   fcol.res,  yPos);
+      doc.text('Notes',    fcol.note, yPos);
+      doc.setDrawColor(180, 180, 180);
+      doc.line(margins.left, yPos + 1.5, pageWidth - margins.right, yPos + 1.5);
+      yPos += lineHeight;
+
+      doc.setFont('helvetica', 'normal');
+      fittings.forEach((f, i) => {
+        if (yPos > 280) { doc.addPage(); yPos = 10; }
+        const type = (f.type||'-').length > 25 ? f.type.substring(0,23)+'…' : (f.type||'-');
+        const loc  = (f.location||'-').length > 28 ? f.location.substring(0,26)+'…' : (f.location||'-');
+        const note = (f.notes||'-').length > 20 ? f.notes.substring(0,18)+'…' : (f.notes||'-');
+        doc.text(String(f.ref || (i+1)), fcol.ref,  yPos);
+        doc.text(type, fcol.type, yPos);
+        doc.text(loc,  fcol.loc,  yPos);
+        doc.text(f.duration || '-', fcol.dur, yPos);
+        doc.text(f.result || '-', fcol.res, yPos);
+        doc.text(note, fcol.note, yPos);
+        yPos += lineHeight - 1;
+      });
+      yPos += 2;
+    }
   }
 
   // EICR Assessment & Observations
@@ -943,62 +1511,112 @@ function downloadPDF() {
     yPos += 2;
   }
 
-  // Check if we need a new page
-  if (yPos > 200) {
-    doc.addPage();
-    yPos = 10;
-  }
+  // ─── Circuit Schedule (landscape page with full test data) ──────────────
+  const filled = isElecCT ? state.circuits.filter(c => c.description) : [];
 
-  // Circuit Schedule
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.text('Circuit Schedule', margins.left, yPos);
-  yPos += lineHeight + 2;
+  if (filled.length > 0) {
+    doc.addPage('a4', 'landscape');
+    yPos = 12;
+    const landW = doc.internal.pageSize.getWidth();   // 297mm
+    const landH = doc.internal.pageSize.getHeight();  // 210mm
 
-  // Table headers
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
+    // Page title + subtitle
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('Circuit Schedule — ' + certLabel(), landW / 2, yPos, { align: 'center' });
+    yPos += 6;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    const subParts = [state.clientName, state.clientAddress, state.clientTown, state.clientPostcode, state.dateOfWork].filter(Boolean);
+    doc.text(subParts.join(' — '), landW / 2, yPos, { align: 'center' });
+    yPos += 5;
+    doc.setDrawColor(30, 41, 59);
+    doc.line(10, yPos, landW - 10, yPos);
+    yPos += 5;
 
-  const cols = { c: margins.left, desc: 20, wire: 42, csa: 58, breaker: 73, test: 90 };
-  doc.text('C#', cols.c, yPos);
-  doc.text('Description', cols.desc, yPos);
-  doc.text('Wiring', cols.wire, yPos);
-  doc.text('CSA', cols.csa, yPos);
-  doc.text('Breaker', cols.breaker, yPos);
-  doc.text('R1+R2', cols.test, yPos);
-  yPos += lineHeight;
+    // Column x-positions (mm) and widths for truncation
+    const cx = {
+      c: 10, desc: 18, wire: 62, ref: 90, pts: 99, live: 107, cpc: 118,
+      brkr: 130, rate: 160, ring: 172, r1r2: 184, irll: 199, irle: 215, rcd: 231
+    };
 
-  // Table rows
-  doc.setFont('helvetica', 'normal');
-  const filled = state.circuits.filter(c => c.description);
-  filled.forEach((c, i) => {
-    const circNum = `C${i + 1}`;
-    const desc = c.description.substring(0, 12);
-    const wire = c.wiringType.substring(0, 8);
-    const csa = `${c.liveCSA}/${c.cpcCSA}`;
-    const breaker = `${c.breakerRating}A`;
-    const r1r2 = c.r1r2 || '-';
-
-    doc.text(circNum, cols.c, yPos);
-    doc.text(desc, cols.desc, yPos);
-    doc.text(wire, cols.wire, yPos);
-    doc.text(csa, cols.csa, yPos);
-    doc.text(breaker, cols.breaker, yPos);
-    doc.text(r1r2, cols.test, yPos);
-    yPos += lineHeight;
-
-    if (yPos > 250) {
-      doc.addPage();
-      yPos = 10;
+    function drawHeaders(y) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.text('C#',          cx.c,    y);
+      doc.text('Description', cx.desc, y);
+      doc.text('Wiring',      cx.wire, y);
+      doc.text('Ref',         cx.ref,  y);
+      doc.text('Pts',         cx.pts,  y);
+      doc.text('Live',        cx.live, y);
+      doc.text('CPC',         cx.cpc,  y);
+      doc.text('Breaker',     cx.brkr, y);
+      doc.text('Rating',      cx.rate, y);
+      doc.text('Ring',        cx.ring, y);
+      doc.text('R1+R2',       cx.r1r2, y);
+      doc.text('IR L-L',      cx.irll, y);
+      doc.text('IR L-E',      cx.irle, y);
+      doc.text('RCD ms',      cx.rcd,  y);
+      doc.setDrawColor(180, 180, 180);
+      doc.line(10, y + 1.5, landW - 10, y + 1.5);
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(6.5);
+      doc.text('CSA mm² · R1+R2 Ω · IR MΩ · RCD ms', cx.c, y + 5);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      return y + 8;
     }
-  });
 
-  yPos += 4;
+    yPos = drawHeaders(yPos);
 
-  // Footer
-  doc.setFont('helvetica', 'italic');
-  doc.setFontSize(8);
-  doc.text(`Generated by E-Fix Data Collector on ${new Date().toLocaleString()}`, pageWidth / 2, pageWidth - 10, { align: 'center' });
+    function trunc(s, n) { if (!s) return '-'; return s.length > n ? s.substring(0, n - 1) + '…' : s; }
+
+    filled.forEach((c, i) => {
+      // page break if needed (leave room for ring sub-row)
+      if (yPos > landH - 18) {
+        doc.addPage('a4', 'landscape');
+        yPos = 12;
+        yPos = drawHeaders(yPos);
+      }
+
+      doc.text('C' + (i + 1),                                cx.c,    yPos);
+      doc.text(trunc(c.description, 30),                     cx.desc, yPos);
+      doc.text(trunc(c.wiringType, 18),                      cx.wire, yPos);
+      doc.text(c.refMethod || '-',                           cx.ref,  yPos);
+      doc.text(c.points || '-',                              cx.pts,  yPos);
+      doc.text(c.liveCSA || '-',                             cx.live, yPos);
+      doc.text(c.cpcCSA || '-',                              cx.cpc,  yPos);
+      doc.text(trunc(c.breakerType, 19),                     cx.brkr, yPos);
+      doc.text(c.breakerRating ? c.breakerRating + 'A' : '-', cx.rate, yPos);
+      doc.text(c.isRing ? 'Yes' : 'No',                      cx.ring, yPos);
+      doc.text(c.r1r2 || '-',                                cx.r1r2, yPos);
+      doc.text(c.irLiveL || '-',                             cx.irll, yPos);
+      doc.text(c.irLiveE || '-',                             cx.irle, yPos);
+      doc.text(c.rcdTrip || '-',                             cx.rcd,  yPos);
+      yPos += 5;
+
+      // Ring end-to-end sub-row if ring circuit with any value
+      if (c.isRing && (c.ringLL || c.ringNN || c.ringEE)) {
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(7);
+        const ringLine = 'Ring end-to-end: LL = ' + (c.ringLL || '-') + ' Ω, NN = ' + (c.ringNN || '-') + ' Ω, EE = ' + (c.ringEE || '-') + ' Ω';
+        doc.text(ringLine, cx.desc, yPos);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        yPos += 4;
+      }
+    });
+
+    // Landscape footer
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7);
+    doc.text('Generated by E-Fix Data Collector on ' + new Date().toLocaleString(), landW / 2, landH - 6, { align: 'center' });
+  } else {
+    // No circuits — portrait footer on current page
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8);
+    doc.text('Generated by E-Fix Data Collector on ' + new Date().toLocaleString(), pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
+  }
 
   // Download
   const ts = new Date().toISOString().slice(0, 10);
@@ -1013,9 +1631,11 @@ function startNew() {
       step:0, certType:null, showVal:false, draftId: null,
       clientName:"", clientAddress:"", clientTown:"", clientPostcode:"", clientPhone:"",
       installAddress:"", installSame:true, dateOfWork:new Date().toISOString().split("T")[0],
-      installationType:"", description:"", boardType:"rcbo",
+      installationType:[], description:"", boardType:"rcbo",
       ze:"", pfc:"", overallAssessment:"", observations:[],
       circuits:[blankCircuit()], selectedTemplate:null, expandedCircuit:0,
+      fireSystem: blankFireSystem(), fireDevices: [blankFireDevice()], expandedFireDevice: 0,
+      emlightSystem: blankEmlightSystem(), emlightFittings: [blankEmlightFitting()], expandedEmlightFitting: 0,
     };
     render();
   }
