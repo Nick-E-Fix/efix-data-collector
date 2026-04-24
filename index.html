@@ -107,6 +107,10 @@
   .check-box.checked svg { display: block; }
   .check-label { font-size: 14px; color: #475569; cursor: pointer; }
   .check-label.checked { color: var(--dark); font-weight: 600; }
+  .part-label { font-size: 11px; font-weight: 700; color: var(--blue); text-transform: uppercase; letter-spacing: 1px; margin: 16px 0 6px; padding-left: 4px; border-left: 3px solid var(--blue); padding-left: 8px; }
+  .supply-btn { flex: 1; text-align: center; padding: 10px 8px; border-radius: 8px; font-size: 14px; font-weight: 600; border: none; cursor: pointer; background: #f1f5f9; color: #475569; }
+  .supply-btn.sel { background: var(--blue); color: #fff; }
+  .supply-btn.sel-green { background: var(--green); color: #fff; }
 </style>
 </head>
 <body>
@@ -117,7 +121,19 @@
 <script>
 // ─── Data ──────────────────────────────────────────────────────────────────
 
-const WIRING_TYPES = ["Twin & Earth","SWA","MICC","Flex","Singles in Conduit","Singles in Trunking","SY Cable","FP Cable","Data Cable"];
+const WIRING_TYPES = [
+  "N/A",
+  "LIM",
+  "A — Thermoplastic insulated / sheathed cables",
+  "B — Thermoplastic cables in metallic conduit",
+  "C — Thermoplastic cables in non-metallic conduit",
+  "D — Thermoplastic cables in metallic trunking",
+  "E — Thermoplastic cables in non-metallic trunking",
+  "F — Thermoplastic / SWA cables",
+  "G — Thermosetting / SWA cables",
+  "H — Mineral-insulated cables",
+  "O — Other",
+];
 const REF_METHODS = ["A","B","C","E","100","101","102","103"];
 const CSA_SIZES = ["1.0","1.5","2.5","4.0","6.0","10.0","16.0","25.0","35.0"];
 const BREAKER_RATINGS = ["3","5","6","10","13","16","20","25","32","40","45","50","63","80","100"];
@@ -205,9 +221,11 @@ const TEMPLATES = {
 let state = {
   step: 0, certType: null, showVal: false, draftId: null,
   clientName: "", clientAddress: "", clientTown: "", clientPostcode: "", clientPhone: "",
-  installAddress: "", installSame: true, dateOfWork: new Date().toISOString().split("T")[0],
+  installStreet: "", installTown: "", installPostcode: "",
+  dateOfWork: new Date().toISOString().split("T")[0],
   installationType: [], description: "", boardType: "rcbo",
-  ze: "", pfc: "",
+  existingComments: "",
+  ze: "", pfc: "", supplyLiveConductors: "", supplyAC: "", supplyDC: "", supplyOther: "", supplyPolarity: "", supplyProtectiveDevice: "",
   overallAssessment: "", observations: [],
   circuits: [blankCircuit()],
   selectedTemplate: null,
@@ -223,7 +241,7 @@ let state = {
 };
 
 function blankCircuit() {
-  return { description:"",wiringType:"",refMethod:"",points:"",liveCSA:"",cpcCSA:"",breakerType:"",breakerRating:"",isRing:false,ringLL:"",ringNN:"",ringEE:"",r1r2:"",irLiveL:"",irLiveE:"",rcdTrip:"" };
+  return { description:"",wiringType:"",refMethod:"",points:"",liveCSA:"",cpcCSA:"",breakerType:"",breakerRating:"",shortCircuitCapacity:"",isRing:false,ringLL:"",ringNN:"",ringEE:"",r1r2:"",irLiveL:"",irLiveE:"",rcdTrip:"",disconnectionTime:"",polarity:"",rcdTestButton:"",comments:"" };
 }
 
 function blankObs() { return { code:"", location:"", observation:"" }; }
@@ -260,6 +278,18 @@ function set(updates) { Object.assign(state, updates); render(); }
 // Silent update — saves value to state WITHOUT re-rendering (no focus loss)
 function s(field, val) { state[field] = val; }
 function sc(idx, field, val) { state.circuits[idx][field] = val; }
+function scRing(idx, field, val) {
+  state.circuits[idx][field] = val;
+  const c = state.circuits[idx];
+  const ll = parseFloat(c.ringLL);
+  const ee = parseFloat(c.ringEE);
+  if (!isNaN(ll) && !isNaN(ee)) {
+    const calc = ((ll + ee) / 4).toFixed(2);
+    c.r1r2 = calc;
+    const el = document.querySelector(`[data-field="r1r2"][data-idx="${idx}"]`);
+    if (el) el.value = calc;
+  }
+}
 function so(idx, field, val) { state.observations[idx][field] = val; }
 function sfs(field, val) { state.fireSystem[field] = val; }
 function sfd(idx, field, val) { state.fireDevices[idx][field] = val; }
@@ -322,6 +352,17 @@ function loadDraft(draftId) {
   if (!state.emlightSystem) state.emlightSystem = blankEmlightSystem();
   if (!state.emlightFittings || !state.emlightFittings.length) state.emlightFittings = [blankEmlightFitting()];
   if (typeof state.expandedEmlightFitting !== 'number') state.expandedEmlightFitting = 0;
+  // Back-fill new address + supply fields
+  if (!state.installStreet) state.installStreet = state.installSame ? (state.clientAddress || "") : (state.installAddress || "");
+  if (!state.installTown) state.installTown = state.installSame ? (state.clientTown || "") : "";
+  if (!state.installPostcode) state.installPostcode = state.installSame ? (state.clientPostcode || "") : "";
+  if (state.existingComments === undefined) state.existingComments = "";
+  if (!state.supplyLiveConductors) state.supplyLiveConductors = "";
+  if (!state.supplyAC) state.supplyAC = "";
+  if (!state.supplyDC) state.supplyDC = "";
+  if (!state.supplyOther) state.supplyOther = "";
+  if (!state.supplyPolarity) state.supplyPolarity = "";
+  if (!state.supplyProtectiveDevice) state.supplyProtectiveDevice = "";
   render();
 }
 
@@ -356,40 +397,58 @@ function setupAutoSave() {
 
 // ─── Postcode Lookup ───────────────────────────────────────────────────────
 
-let pcLoading = false;
-let pcMsg = "";
-let pcMsgErr = false;
-let pcAreaInfo = "";
+let pcLoading = false, pcMsg = "", pcMsgErr = false, pcAreaInfo = "";
+let pcLoading2 = false, pcMsg2 = "", pcMsgErr2 = false, pcAreaInfo2 = "";
 
 async function lookupPostcode(target) {
-  const pc = target === "client" ? state.clientPostcode : state.installAddress;
+  const isInstall = target === "install";
+  const pc = target === "client" ? state.clientPostcode : state.installPostcode;
   if (!pc || pc.replace(/\s/g,"").length < 5) {
-    pcMsg = "Enter a full postcode first"; pcMsgErr = true; pcAreaInfo = ""; render(); return;
+    if (isInstall) { pcMsg2 = "Enter a full postcode first"; pcMsgErr2 = true; pcAreaInfo2 = ""; }
+    else { pcMsg = "Enter a full postcode first"; pcMsgErr = true; pcAreaInfo = ""; }
+    render(); return;
   }
-  pcLoading = true; pcMsg = "Looking up..."; pcMsgErr = false; pcAreaInfo = ""; render();
+  if (isInstall) { pcLoading2 = true; pcMsg2 = "Looking up..."; pcMsgErr2 = false; pcAreaInfo2 = ""; }
+  else { pcLoading = true; pcMsg = "Looking up..."; pcMsgErr = false; pcAreaInfo = ""; }
+  render();
   try {
     const resp = await fetch("https://api.postcodes.io/postcodes/" + encodeURIComponent(pc.trim()));
-    if (!resp.ok) { pcMsg = "Postcode not found — check and retry"; pcMsgErr = true; pcLoading = false; render(); return; }
+    if (!resp.ok) {
+      if (isInstall) { pcMsg2 = "Postcode not found — check and retry"; pcMsgErr2 = true; pcLoading2 = false; }
+      else { pcMsg = "Postcode not found — check and retry"; pcMsgErr = true; pcLoading = false; }
+      render(); return;
+    }
     const data = await resp.json();
     if (data.status === 200 && data.result) {
       const r = data.result;
       const town = r.admin_district || r.admin_county || "";
       const ward = r.admin_ward || "";
       const parish = r.parish || "";
-      pcLoading = false;
-      if (target === "client") {
+      if (isInstall) {
+        pcLoading2 = false;
+        state.installTown = town;
+        state.installPostcode = r.postcode;
+        pcAreaInfo2 = [ward, parish].filter(Boolean).join(" · ");
+        pcMsg2 = "Town auto-filled: " + town;
+        pcMsgErr2 = false;
+      } else {
+        pcLoading = false;
         state.clientTown = town;
-        state.clientPostcode = r.postcode; // formatted version
+        state.clientPostcode = r.postcode;
+        pcAreaInfo = [ward, parish].filter(Boolean).join(" · ");
+        pcMsg = "Town auto-filled: " + town;
+        pcMsgErr = false;
       }
-      pcAreaInfo = [ward, parish].filter(Boolean).join(" · ");
-      pcMsg = "Town auto-filled: " + town;
-      pcMsgErr = false;
       render();
     } else {
-      pcMsg = "Postcode not found"; pcMsgErr = true; pcLoading = false; render();
+      if (isInstall) { pcMsg2 = "Postcode not found"; pcMsgErr2 = true; pcLoading2 = false; }
+      else { pcMsg = "Postcode not found"; pcMsgErr = true; pcLoading = false; }
+      render();
     }
   } catch (e) {
-    pcMsg = "No signal — enter address manually"; pcMsgErr = true; pcLoading = false; render();
+    if (isInstall) { pcMsg2 = "No signal — enter address manually"; pcMsgErr2 = true; pcLoading2 = false; }
+    else { pcMsg = "No signal — enter address manually"; pcMsgErr = true; pcLoading = false; }
+    render();
   }
 }
 
@@ -590,23 +649,28 @@ function startNewSession() {
 
 // ─── Step 1: Job Details ───────────────────────────────────────────────────
 
+const LIVE_CONDUCTOR_TYPES = ["1-Phase 2-Wire","2-Phase 3-Wire","3-Phase 3-Wire","3-Phase 4-Wire"];
+const SUPPLY_PROTECTIVE_DEVICES = ["BS 1361 Fuse HBC Type 2","BS 88-2 Fuse System G"];
+
 function renderStep1() {
-  const s = state, v = s.showVal;
-  const eicr = s.certType === "eicr";
-  const isFireOrEm = s.certType === "fire" || s.certType === "emlight";
+  const st = state, v = st.showVal;
+  const eicr = st.certType === "eicr";
+  const isFireOrEm = st.certType === "fire" || st.certType === "emlight";
   return `
     <div class="header">
       <div class="logo">Job Details</div>
-      <div class="subtitle">${certLabel()} <span class="badge" style="background:${certColor()}">${s.certType.toUpperCase()}</span></div>
+      <div class="subtitle">${certLabel()} <span class="badge" style="background:${certColor()}">${st.certType.toUpperCase()}</span></div>
     </div>
 
+    <div class="part-label">Part 1 — Client &amp; Installation Address</div>
+
     <div class="section">
-      <div class="section-title">Client</div>
+      <div class="section-title">Client Details</div>
       <div class="field"><label>Client Name *</label>
-        <input ${v&&!s.clientName?'class="err"':''} data-field="clientName" oninput="s('clientName',this.value)" placeholder="Full name"></div>
+        <input ${v&&!st.clientName?'class="err"':''} data-field="clientName" oninput="s('clientName',this.value)" placeholder="Full name"></div>
       <div class="field"><label>Postcode * — tap Lookup to auto-fill town</label>
         <div class="pc-row">
-          <input ${v&&!s.clientPostcode?'class="err"':''} data-field="clientPostcode" oninput="s('clientPostcode',this.value)" placeholder="DE1 1AA" style="text-transform:uppercase">
+          <input ${v&&!st.clientPostcode?'class="err"':''} data-field="clientPostcode" oninput="s('clientPostcode',this.value)" placeholder="DE1 1AA" style="text-transform:uppercase">
           <button class="btn-sm" style="background:var(--blue);color:#fff;white-space:nowrap" onclick="lookupPostcode('client')">${pcLoading?'...':'Lookup'}</button>
         </div>
       </div>
@@ -621,15 +685,32 @@ function renderStep1() {
     </div>
 
     <div class="section">
-      <div class="section-title">Installation</div>
-      ${toggle('installSame', s.installSame, 'Same address as client')}
-      ${!s.installSame ? `<div class="field" style="margin-top:10px"><label>Installation Address *</label>
-        <input ${v&&!s.installSame&&!s.installAddress?'class="err"':''} data-field="installAddress" oninput="s('installAddress',this.value)" placeholder="Full installation address"></div>` : ''}
-      <div class="field" style="margin-top:10px"><label>Date of Work *</label>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="section-title" style="margin-bottom:0">Installation Address</div>
+        <button class="btn-sm" style="background:#eff6ff;color:var(--blue);border:1px solid #bfdbfe" onclick="copyClientToInstall()">Copy from Client</button>
+      </div>
+      <div class="field"><label>Postcode — tap Lookup to auto-fill town</label>
+        <div class="pc-row">
+          <input data-field="installPostcode" oninput="s('installPostcode',this.value)" placeholder="DE1 1AA" style="text-transform:uppercase">
+          <button class="btn-sm" style="background:var(--blue);color:#fff;white-space:nowrap" onclick="lookupPostcode('install')">${pcLoading2?'...':'Lookup'}</button>
+        </div>
+      </div>
+      ${pcMsg2 ? `<div class="pc-status${pcMsgErr2?' error':''}">${pcMsg2}</div>` : ''}
+      ${pcAreaInfo2 ? `<div class="pc-status" style="color:var(--blue);font-weight:600">${pcAreaInfo2}</div>` : ''}
+      <div class="field"><label>Address</label>
+        <input data-field="installStreet" oninput="s('installStreet',this.value)" placeholder="Street address"></div>
+      <div class="field"><label>Town</label>
+        <input data-field="installTown" oninput="s('installTown',this.value)" placeholder="Auto-filled by postcode lookup"></div>
+    </div>
+
+    <div class="part-label">Part 2 — Date &amp; Works</div>
+
+    <div class="section">
+      <div class="field"><label>Date of Work *</label>
         <input type="date" data-field="dateOfWork" oninput="s('dateOfWork',this.value)"></div>
       ${!isFireOrEm ? `<div class="field"><label>Installation Type (tick all that apply)</label>
         ${INSTALL_TYPES.map(t => {
-          const checked = Array.isArray(s.installationType) && s.installationType.includes(t);
+          const checked = Array.isArray(st.installationType) && st.installationType.includes(t);
           return `<div class="check-row" onclick="toggleInstallType('${t}')">
             <div class="check-box${checked?' checked':''}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></div>
             <span class="check-label${checked?' checked':''}">${t}</span>
@@ -637,14 +718,63 @@ function renderStep1() {
         }).join("")}
       </div>` : ''}
       <div class="field"><label>Description of Work</label>
-        <input data-field="description" oninput="s('description',this.value)" placeholder="${eicr?'e.g. Periodic inspection & testing':s.certType==='minor'?'e.g. Install additional socket outlet':s.certType==='fire'?'e.g. Annual service of L2 fire alarm system':s.certType==='emlight'?'e.g. Annual 3-hour emergency lighting test':'e.g. New consumer unit and full rewire'}"></div>
+        <input data-field="description" oninput="s('description',this.value)" placeholder="${eicr?'e.g. Periodic inspection & testing':st.certType==='minor'?'e.g. Install additional socket outlet':st.certType==='fire'?'e.g. Annual service of L2 fire alarm system':st.certType==='emlight'?'e.g. Annual 3-hour emergency lighting test':'e.g. New consumer unit and full rewire'}"></div>
     </div>
 
-    ${!isFireOrEm ? `<div class="section">
-      <div class="section-title">Supply Characteristics</div>
+    <div class="part-label">Part 3 — Existing Installation</div>
+
+    <div class="section">
+      <div class="field"><label>Comments on Existing Installation</label>
+        <textarea data-field="existingComments" oninput="s('existingComments',this.value)" placeholder="e.g. Existing wiring in good condition, consumer unit dated approx. 2010, no visible defects noted..."></textarea>
+      </div>
+    </div>
+
+    ${!isFireOrEm ? `
+    <div class="part-label">Part 4 — Supply Characteristics</div>
+
+    <div class="section">
       <div class="row">
         <div><label>Ze (Ω)</label><input inputmode="decimal" data-field="ze" oninput="s('ze',this.value)" placeholder="e.g. 0.35"></div>
         <div><label>PFC (kA)</label><input inputmode="decimal" data-field="pfc" oninput="s('pfc',this.value)" placeholder="e.g. 1.2"></div>
+      </div>
+
+      <div class="field"><label>Supply Protective Device</label>
+        <select data-field="supplyProtectiveDevice" onchange="s('supplyProtectiveDevice',this.value)">
+          ${opts(SUPPLY_PROTECTIVE_DEVICES)}
+        </select>
+      </div>
+
+      <div class="divider"></div>
+      <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px">Number &amp; Type of Live Conductors</div>
+      <div class="field">
+        <select data-field="supplyLiveConductors" onchange="s('supplyLiveConductors',this.value)">
+          ${opts(LIVE_CONDUCTOR_TYPES, "Select supply type")}
+        </select>
+      </div>
+
+      <div class="divider"></div>
+      <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px">Nature of Supply</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span style="font-size:14px;font-weight:600;color:#475569;width:40px">AC</span>
+        <button class="supply-btn${st.supplyAC==='tick'?' sel-green':''}" onclick="set({supplyAC:'tick'})">✔</button>
+        <button class="supply-btn${st.supplyAC==='na'?' sel':''}" onclick="set({supplyAC:'na'})">N/A</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span style="font-size:14px;font-weight:600;color:#475569;width:40px">DC</span>
+        <button class="supply-btn${st.supplyDC==='tick'?' sel-green':''}" onclick="set({supplyDC:'tick'})">✔</button>
+        <button class="supply-btn${st.supplyDC==='na'?' sel':''}" onclick="set({supplyDC:'na'})">N/A</button>
+      </div>
+      <div class="field">
+        <label>Other (state) — <span id="other-count">${(st.supplyOther||'').length}</span>/20 characters</label>
+        <input data-field="supplyOther" maxlength="20" oninput="s('supplyOther',this.value.slice(0,20));var el=document.getElementById('other-count');if(el)el.textContent=Math.min(this.value.length,20)" placeholder="Describe other supply type">
+      </div>
+
+      <div class="divider"></div>
+      <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px">Confirmation of Supply Polarity</div>
+      <div style="display:flex;gap:8px">
+        <button class="supply-btn${st.supplyPolarity==='confirmed'?' sel-green':''}" onclick="set({supplyPolarity:'confirmed'})">✔ Confirmed</button>
+        <button class="supply-btn${st.supplyPolarity==='na'?' sel':''}" onclick="set({supplyPolarity:'na'})">N/A</button>
+        <button class="supply-btn${st.supplyPolarity==='lim'?' sel':''}" onclick="set({supplyPolarity:'lim'})">LIM</button>
       </div>
     </div>` : ''}
 
@@ -779,15 +909,21 @@ function renderCircuit(c, i) {
           <select data-field="breakerType" data-idx="${i}" onchange="sc(${i},'breakerType',this.value)">${opts(BREAKER_TYPES)}</select></div>
         <div><label>Rating *</label>
           <select ${v&&!c.breakerRating?'class="err"':''} data-field="breakerRating" data-idx="${i}" onchange="sc(${i},'breakerRating',this.value)">${optsWithSuffix(BREAKER_RATINGS,'A','Amps')}</select></div>
+        <div><label>Short Circuit Capacity</label>
+          <select data-field="shortCircuitCapacity" data-idx="${i}" onchange="sc(${i},'shortCircuitCapacity',this.value)">
+            <option value="">—</option>
+            <option value="6kA">6kA</option>
+            <option value="10kA">10kA</option>
+          </select></div>
       </div>
       <div style="margin-bottom:10px">
         ${toggle('ring_'+i, c.isRing, 'Ring Circuit')}
       </div>
       ${c.isRing ? `
       <div class="row">
-        <div><label>Ring LL (Ω)</label><input inputmode="decimal" data-field="ringLL" data-idx="${i}" oninput="sc(${i},'ringLL',this.value)" placeholder="0.00"></div>
+        <div><label>Ring LL (Ω)</label><input inputmode="decimal" data-field="ringLL" data-idx="${i}" oninput="scRing(${i},'ringLL',this.value)" placeholder="0.00"></div>
         <div><label>Ring NN (Ω)</label><input inputmode="decimal" data-field="ringNN" data-idx="${i}" oninput="sc(${i},'ringNN',this.value)" placeholder="0.00"></div>
-        <div><label>Ring EE (Ω)</label><input inputmode="decimal" data-field="ringEE" data-idx="${i}" oninput="sc(${i},'ringEE',this.value)" placeholder="0.00"></div>
+        <div><label>Ring EE (Ω)</label><input inputmode="decimal" data-field="ringEE" data-idx="${i}" oninput="scRing(${i},'ringEE',this.value)" placeholder="0.00"></div>
       </div>` : ''}
       <div class="divider"></div>
       <div class="test-title">Test Results</div>
@@ -798,7 +934,34 @@ function renderCircuit(c, i) {
       </div>
       <div class="row">
         <div><label>RCD Trip (ms)</label><input data-field="rcdTrip" data-idx="${i}" oninput="sc(${i},'rcdTrip',this.value)" placeholder="n/a"></div>
-        <div></div><div></div>
+        <div><label>Disconnection Time</label>
+          <select data-field="disconnectionTime" data-idx="${i}" onchange="sc(${i},'disconnectionTime',this.value)">
+            <option value="">—</option>
+            <option value="0.2s">0.2s</option>
+            <option value="0.4s">0.4s</option>
+            <option value="5s">5s</option>
+          </select></div>
+        <div></div>
+      </div>
+      <div class="row" style="margin-bottom:10px">
+        <div>
+          <label>Polarity</label>
+          <div style="display:flex;gap:6px;margin-top:4px">
+            <button class="supply-btn${c.polarity==='tick'?' sel-green':''}" onclick="sc(${i},'polarity','tick');render()">✔</button>
+            <button class="supply-btn${c.polarity==='lim'?' sel':''}" onclick="sc(${i},'polarity','lim');render()">LIM</button>
+          </div>
+        </div>
+        <div>
+          <label>RCD Test Button</label>
+          <div style="display:flex;gap:6px;margin-top:4px">
+            <button class="supply-btn${c.rcdTestButton==='tick'?' sel-green':''}" onclick="sc(${i},'rcdTestButton','tick');render()">✔</button>
+            <button class="supply-btn${c.rcdTestButton==='na'?' sel':''}" onclick="sc(${i},'rcdTestButton','na');render()">N/A</button>
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Comments</label>
+        <input data-field="comments" data-idx="${i}" oninput="sc(${i},'comments',this.value)" placeholder="Any notes for this circuit...">
       </div>
       <div style="margin-top:8px;text-align:right">
         ${state.circuits.length > 1 ? `<button class="btn-sm remove-btn" onclick="event.stopPropagation();removeCircuit(${i})">Remove Circuit</button>` : ''}
@@ -1058,14 +1221,20 @@ function renderStep3() {
       <div class="summary-line">
         <div><strong>Type:</strong> ${certLabel()} <span class="badge" style="background:${certColor()}">${s.certType.toUpperCase()}</span></div>
         <div><strong>Client:</strong> ${s.clientName}</div>
-        <div><strong>Address:</strong> ${s.clientAddress}${s.clientTown?', '+s.clientTown:''} ${s.clientPostcode}</div>
+        <div><strong>Client Address:</strong> ${s.clientAddress}${s.clientTown?', '+s.clientTown:''} ${s.clientPostcode}</div>
         ${s.clientPhone?`<div><strong>Phone:</strong> ${s.clientPhone}</div>`:''}
+        ${s.installStreet||s.installTown||s.installPostcode?`<div><strong>Install Address:</strong> ${s.installStreet}${s.installTown?', '+s.installTown:''} ${s.installPostcode}</div>`:''}
         <div><strong>Date:</strong> ${s.dateOfWork}</div>
         ${isElec && Array.isArray(s.installationType)&&s.installationType.length?`<div><strong>Type:</strong> ${s.installationType.join(', ')}</div>`:isElec && typeof s.installationType==='string'&&s.installationType?`<div><strong>Type:</strong> ${s.installationType}</div>`:''}
         ${s.description?`<div><strong>Work:</strong> ${s.description}</div>`:''}
+        ${s.existingComments?`<div><strong>Existing:</strong> ${s.existingComments}</div>`:''}
         ${isElec && s.certType!=='minor'?`<div><strong>Board:</strong> ${s.boardType.toUpperCase()}</div>`:''}
         ${isElec && s.ze?`<div><strong>Ze:</strong> ${s.ze}Ω</div>`:''}
         ${isElec && s.pfc?`<div><strong>PFC:</strong> ${s.pfc}kA</div>`:''}
+        ${isElec && s.supplyProtectiveDevice?`<div><strong>Protective Device:</strong> ${s.supplyProtectiveDevice}</div>`:''}
+        ${isElec && s.supplyLiveConductors?`<div><strong>Live Conductors:</strong> ${s.supplyLiveConductors}</div>`:''}
+        ${isElec && (s.supplyAC||s.supplyDC)?`<div><strong>Nature:</strong> AC: ${s.supplyAC||'—'} | DC: ${s.supplyDC||'—'}${s.supplyOther?' | Other: '+s.supplyOther:''}</div>`:''}
+        ${isElec && s.supplyPolarity?`<div><strong>Polarity:</strong> ${s.supplyPolarity==='confirmed'?'✔ Confirmed':s.supplyPolarity==='na'?'N/A':'LIM'}</div>`:''}
         ${s.certType==='eicr'&&s.overallAssessment?`<div><strong>Assessment:</strong> <span style="color:${s.overallAssessment==='Satisfactory'?'#16a34a':'#dc2626'};font-weight:700">${s.overallAssessment}</span></div>`:''}
         ${isFire && fs.visitType?`<div><strong>Visit:</strong> ${fs.visitType}</div>`:''}
         ${isFire && fs.category?`<div><strong>Category:</strong> ${fs.category}</div>`:''}
@@ -1171,6 +1340,15 @@ function toggleField(id) {
   }
 }
 
+function copyClientToInstall() {
+  state.installStreet = state.clientAddress;
+  state.installTown = state.clientTown;
+  state.installPostcode = state.clientPostcode;
+  pcMsg2 = ""; pcAreaInfo2 = "";
+  render();
+  showToast("Client details copied to installation address");
+}
+
 function toggleInstallType(type) {
   if (!Array.isArray(state.installationType)) state.installationType = [];
   const idx = state.installationType.indexOf(type);
@@ -1223,15 +1401,22 @@ function buildData() {
     jobDetails: {
       clientName: s.clientName, clientAddress: s.clientAddress, clientTown: s.clientTown,
       clientPostcode: s.clientPostcode, clientPhone: s.clientPhone,
-      installationAddress: s.installSame ? "Same as client" : s.installAddress,
+      installationAddress: { street: s.installStreet, town: s.installTown, postcode: s.installPostcode },
       dateOfWork: s.dateOfWork,
       description: s.description,
+      existingComments: s.existingComments,
       ...(isElec ? { installationType: s.installationType, boardType: s.boardType } : {}),
     },
   };
 
   if (isElec) {
-    data.supplyCharacteristics = { ze: s.ze, pfc: s.pfc };
+    data.supplyCharacteristics = {
+      ze: s.ze, pfc: s.pfc,
+      protectiveDevice: s.supplyProtectiveDevice,
+      liveConductors: s.supplyLiveConductors,
+      ac: s.supplyAC, dc: s.supplyDC, other: s.supplyOther,
+      polarity: s.supplyPolarity,
+    };
     data.circuits = s.circuits.map((c, i) => ({ number: i + 1, ...c }));
   }
   if (s.certType === 'eicr') {
