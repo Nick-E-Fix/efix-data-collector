@@ -149,7 +149,7 @@ const CIRCUIT_NAMES = [
   "CCTV","Data","Doorbell","Solar PV","Battery Storage","Air Source Heat Pump",
   "UFH (Underfloor Heating)","Spur","FCU (Fused Connection Unit)",
 ];
-const INSTALL_TYPES = ["New installation","Addition to existing installation","Alteration to existing installation"];
+const INSTALL_TYPES = ["New installation","Addition to existing installation","Alteration to existing installation","Replacement consumer unit"];
 
 // ─── Fire alarm data ──────────────────────────────────────────────────────
 const FIRE_DEVICE_TYPES = [
@@ -226,7 +226,7 @@ let state = {
   installationType: [], description: "", boardType: "rcbo",
   existingComments: "",
   ze: "", pfc: "", supplyLiveConductors: "", supplyAC: "", supplyDC: "", supplyOther: "", supplyPolarity: "", supplyProtectiveDevice: "", supplyProtectiveDeviceRating: "",
-  mainSwitchType: "", mainSwitchRating: "", mainSwitchPoles: "", mainSwitchRcdCurrent: "", mainSwitchRcdType: "",
+  mainSwitchType: "", mainSwitchRating: "", mainSwitchPoles: "", mainSwitchHasRcd: false, mainSwitchRcdCurrent: "", mainSwitchRcdTimeDelay: "",
   eqBondingPresent: false, eqBondingServices: [],
   overallAssessment: "", observations: [],
   circuits: [blankCircuit()],
@@ -369,8 +369,9 @@ function loadDraft(draftId) {
   if (!state.mainSwitchType) state.mainSwitchType = "";
   if (!state.mainSwitchRating) state.mainSwitchRating = "";
   if (!state.mainSwitchPoles) state.mainSwitchPoles = "";
+  if (state.mainSwitchHasRcd === undefined) state.mainSwitchHasRcd = false;
   if (!state.mainSwitchRcdCurrent) state.mainSwitchRcdCurrent = "";
-  if (!state.mainSwitchRcdType) state.mainSwitchRcdType = "";
+  if (!state.mainSwitchRcdTimeDelay) state.mainSwitchRcdTimeDelay = "";
   if (state.eqBondingPresent === undefined) state.eqBondingPresent = false;
   if (!state.eqBondingServices) state.eqBondingServices = [];
   render();
@@ -670,11 +671,11 @@ const SUPPLY_PROTECTIVE_DEVICES = [
   "Isolator (no protection)",
 ];
 const SUPPLY_PROTECTIVE_DEVICE_RATINGS = ["30A","40A","45A","60A","80A","100A","125A","160A","200A"];
-const MAIN_SWITCH_TYPES = ["Isolator","RCD","RCBO","Switch Disconnector"];
+const MAIN_SWITCH_TYPES = ["BS EN 60947-3 Isolator","BS EN 61008-1 Type A","BS EN 61008-1 Type AC"];
 const MAIN_SWITCH_RATINGS = ["40A","63A","80A","100A","125A","160A","200A"];
 const MAIN_SWITCH_POLES = ["1","2","3","4"];
 const MAIN_SWITCH_RCD_CURRENTS = ["10mA","30mA","100mA","300mA","500mA"];
-const MAIN_SWITCH_RCD_TYPES = ["Type A","Type AC","Type B"];
+const MAIN_SWITCH_RCD_DELAYS = ["Instantaneous (no delay)","10ms","30ms","60ms","100ms","150ms","300ms"];
 
 function renderStep1() {
   const st = state, v = st.showVal;
@@ -812,7 +813,7 @@ function renderStep1() {
       <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px">Main Switch Details</div>
       <div class="row">
         <div><label>Type</label>
-          <select data-field="mainSwitchType" onchange="s('mainSwitchType',this.value);render()">
+          <select data-field="mainSwitchType" onchange="s('mainSwitchType',this.value)">
             ${opts(MAIN_SWITCH_TYPES)}
           </select>
         </div>
@@ -827,23 +828,28 @@ function renderStep1() {
           </select>
         </div>
       </div>
-      ${(st.mainSwitchType === 'RCD' || st.mainSwitchType === 'RCBO') ? `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span style="font-size:13px;font-weight:600;color:#475569;white-space:nowrap">RCD?</span>
+        <button class="supply-btn${st.mainSwitchHasRcd?' sel-green':''}" onclick="set({mainSwitchHasRcd:true})">Yes</button>
+        <button class="supply-btn${st.mainSwitchHasRcd===false&&st.mainSwitchHasRcd!==undefined?' sel':''}" onclick="set({mainSwitchHasRcd:false,mainSwitchRcdCurrent:'',mainSwitchRcdTimeDelay:''})">No</button>
+      </div>
+      ${st.mainSwitchHasRcd ? `
       <div class="row">
-        <div><label>RCD Operating Current</label>
+        <div><label>Trip current (mA)</label>
           <select data-field="mainSwitchRcdCurrent" onchange="s('mainSwitchRcdCurrent',this.value)">
             ${opts(MAIN_SWITCH_RCD_CURRENTS, "Select")}
           </select>
         </div>
-        <div><label>RCD Type</label>
-          <select data-field="mainSwitchRcdType" onchange="s('mainSwitchRcdType',this.value)">
-            ${opts(MAIN_SWITCH_RCD_TYPES, "Select")}
+        <div><label>Time delay</label>
+          <select data-field="mainSwitchRcdTimeDelay" onchange="s('mainSwitchRcdTimeDelay',this.value)">
+            ${opts(MAIN_SWITCH_RCD_DELAYS, "Select")}
           </select>
         </div>
       </div>` : ''}
 
       <div class="divider"></div>
       <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px">Equipotential Bonding</div>
-      <div class="check-row" onclick="set({eqBondingPresent:!st.eqBondingPresent})">
+      <div class="check-row" onclick="toggleEqBonding()">
         <div class="check-box${st.eqBondingPresent?' checked':''}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></div>
         <span class="check-label${st.eqBondingPresent?' checked':''}">Equipotential bonding present</span>
       </div>
@@ -1317,7 +1323,7 @@ function renderStep3() {
         ${isElec && s.supplyLiveConductors?`<div><strong>Live Conductors:</strong> ${s.supplyLiveConductors}</div>`:''}
         ${isElec && (s.supplyAC||s.supplyDC)?`<div><strong>Nature:</strong> AC: ${s.supplyAC||'—'} | DC: ${s.supplyDC||'—'}${s.supplyOther?' | Other: '+s.supplyOther:''}</div>`:''}
         ${isElec && s.supplyPolarity?`<div><strong>Polarity:</strong> ${s.supplyPolarity==='confirmed'?'✔ Confirmed':s.supplyPolarity==='na'?'N/A':'LIM'}</div>`:''}
-        ${isElec && s.mainSwitchType?`<div><strong>Main Switch:</strong> ${[s.mainSwitchType,s.mainSwitchRating,s.mainSwitchPoles?s.mainSwitchPoles+'-pole':''].filter(Boolean).join(' · ')}${(s.mainSwitchType==='RCD'||s.mainSwitchType==='RCBO')&&(s.mainSwitchRcdCurrent||s.mainSwitchRcdType)?' | '+[s.mainSwitchRcdCurrent,s.mainSwitchRcdType].filter(Boolean).join(' '):''}</div>`:''}
+        ${isElec && s.mainSwitchType?`<div><strong>Main Switch:</strong> ${[s.mainSwitchType,s.mainSwitchRating,s.mainSwitchPoles?s.mainSwitchPoles+'-pole':''].filter(Boolean).join(' · ')}${s.mainSwitchHasRcd&&(s.mainSwitchRcdCurrent||s.mainSwitchRcdTimeDelay)?' | RCD: '+[s.mainSwitchRcdCurrent,s.mainSwitchRcdTimeDelay].filter(Boolean).join(', '):s.mainSwitchHasRcd?' | RCD: Yes':''}</div>`:''}
         ${isElec && s.eqBondingPresent?`<div><strong>Eq. Bonding:</strong> ✔${Array.isArray(s.eqBondingServices)&&s.eqBondingServices.length?' — '+s.eqBondingServices.join(', '):''}</div>`:''}
         ${s.certType==='eicr'&&s.overallAssessment?`<div><strong>Assessment:</strong> <span style="color:${s.overallAssessment==='Satisfactory'?'#16a34a':'#dc2626'};font-weight:700">${s.overallAssessment}</span></div>`:''}
         ${isFire && fs.visitType?`<div><strong>Visit:</strong> ${fs.visitType}</div>`:''}
@@ -1441,6 +1447,11 @@ function toggleInstallType(type) {
   render();
 }
 
+function toggleEqBonding() {
+  state.eqBondingPresent = !state.eqBondingPresent;
+  render();
+}
+
 function toggleEqBondingService(service) {
   if (!Array.isArray(state.eqBondingServices)) state.eqBondingServices = [];
   const idx = state.eqBondingServices.indexOf(service);
@@ -1509,7 +1520,7 @@ function buildData() {
       liveConductors: s.supplyLiveConductors,
       ac: s.supplyAC, dc: s.supplyDC, other: s.supplyOther,
       polarity: s.supplyPolarity,
-      mainSwitch: { type: s.mainSwitchType, rating: s.mainSwitchRating, poles: s.mainSwitchPoles, rcdOperatingCurrent: s.mainSwitchRcdCurrent, rcdType: s.mainSwitchRcdType },
+      mainSwitch: { type: s.mainSwitchType, rating: s.mainSwitchRating, poles: s.mainSwitchPoles, hasRcd: s.mainSwitchHasRcd, rcdTripCurrent: s.mainSwitchHasRcd ? s.mainSwitchRcdCurrent : "", rcdTimeDelay: s.mainSwitchHasRcd ? s.mainSwitchRcdTimeDelay : "" },
       equipotentialBonding: s.eqBondingPresent ? { present: true, services: s.eqBondingServices || [] } : { present: false, services: [] },
     };
     data.circuits = s.circuits.map((c, i) => ({ number: i + 1, ...c }));
