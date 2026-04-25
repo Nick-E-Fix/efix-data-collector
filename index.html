@@ -137,7 +137,7 @@ const WIRING_TYPES = [
 const REF_METHODS = ["A","B","C","E","100","101","102","103"];
 const CSA_SIZES = ["1.0","1.5","2.5","4.0","6.0","10.0","16.0","25.0","35.0"];
 const BREAKER_RATINGS = ["3","5","6","10","13","16","20","25","32","40","45","50","63","80","100"];
-const BREAKER_TYPES = ["MCB (Type B)","MCB (Type C)","MCB (Type D)","RCBO (Type A)","RCBO (Type AC)","RCD","Fuse (BS88)","Fuse (BS1361)","Fuse (BS3036)"];
+const BREAKER_TYPES = ["BS EN 60898 Type B","BS EN 60898 Type C","MCB (Type D)","BS EN 61009 Type A","BS EN 61009 Type AC","BS EN 61008-1 Type A RCD","BS EN 61008-1 Type AC RCD","RCD","Fuse (BS88)","Fuse (BS1361)","Fuse (BS3036)","BS EN 60947-3 Isolator","BS EN 61643 Type 2 SPD","BS EN 62606 Type B AFDD","BS EN 62606 Type C AFDD"];
 const CIRCUIT_NAMES = [
   "Lighting","Lighting Ground Floor","Lighting First Floor","Lighting Second Floor",
   "Ring Final - Sockets","Ring Final - Downstairs Sockets","Ring Final - Upstairs Sockets",
@@ -225,7 +225,9 @@ let state = {
   dateOfWork: new Date().toISOString().split("T")[0],
   installationType: [], description: "", boardType: "rcbo",
   existingComments: "",
-  ze: "", pfc: "", supplyLiveConductors: "", supplyAC: "", supplyDC: "", supplyOther: "", supplyPolarity: "", supplyProtectiveDevice: "",
+  ze: "", pfc: "", supplyLiveConductors: "", supplyAC: "", supplyDC: "", supplyOther: "", supplyPolarity: "", supplyProtectiveDevice: "", supplyProtectiveDeviceRating: "",
+  mainSwitchType: "", mainSwitchRating: "", mainSwitchPoles: "", mainSwitchRcdCurrent: "", mainSwitchRcdType: "",
+  eqBondingPresent: false, eqBondingServices: [],
   overallAssessment: "", observations: [],
   circuits: [blankCircuit()],
   selectedTemplate: null,
@@ -363,6 +365,14 @@ function loadDraft(draftId) {
   if (!state.supplyOther) state.supplyOther = "";
   if (!state.supplyPolarity) state.supplyPolarity = "";
   if (!state.supplyProtectiveDevice) state.supplyProtectiveDevice = "";
+  if (!state.supplyProtectiveDeviceRating) state.supplyProtectiveDeviceRating = "";
+  if (!state.mainSwitchType) state.mainSwitchType = "";
+  if (!state.mainSwitchRating) state.mainSwitchRating = "";
+  if (!state.mainSwitchPoles) state.mainSwitchPoles = "";
+  if (!state.mainSwitchRcdCurrent) state.mainSwitchRcdCurrent = "";
+  if (!state.mainSwitchRcdType) state.mainSwitchRcdType = "";
+  if (state.eqBondingPresent === undefined) state.eqBondingPresent = false;
+  if (!state.eqBondingServices) state.eqBondingServices = [];
   render();
 }
 
@@ -524,7 +534,7 @@ function certColor() {
 function certLabel() {
   const c = state.certType;
   if (c === 'minor') return 'Minor Works';
-  if (c === 'eic') return 'EIC';
+  if (c === 'eic') return 'DEIC';
   if (c === 'eicr') return 'EICR';
   if (c === 'fire') return 'Fire Alarm';
   if (c === 'emlight') return 'Emergency Lighting';
@@ -587,7 +597,7 @@ function restoreValues() {
 function renderStep0() {
   const types = [
     { id:"minor", label:"Minor Works", color:"#dc2626", desc:"Single circuit / small job" },
-    { id:"eic", label:"EIC", color:"#dc2626", desc:"New installation certificate" },
+    { id:"eic", label:"DEIC", color:"#dc2626", desc:"New installation certificate" },
     { id:"eicr", label:"EICR", color:"#16a34a", desc:"Condition report" },
     { id:"fire", label:"Fire Alarm", color:"#f59e0b", desc:"Fire alarm install / service" },
     { id:"emlight", label:"Emergency Lighting", color:"#8b5cf6", desc:"Emergency lighting install / test" },
@@ -622,7 +632,7 @@ function renderStep0() {
       </div>
       ${Object.values(drafts).sort((a,b) => parseInt(b.id) - parseInt(a.id)).map(draft => {
         const certColor = draft.certType === 'eicr' ? '#16a34a' : draft.certType === 'fire' ? '#f59e0b' : draft.certType === 'emlight' ? '#8b5cf6' : '#dc2626';
-        const certLabel = draft.certType === 'minor' ? 'Minor Works' : draft.certType === 'eic' ? 'EIC' : draft.certType === 'eicr' ? 'EICR' : draft.certType === 'fire' ? 'Fire Alarm' : draft.certType === 'emlight' ? 'Emergency Lighting' : '';
+        const certLabel = draft.certType === 'minor' ? 'Minor Works' : draft.certType === 'eic' ? 'DEIC' : draft.certType === 'eicr' ? 'EICR' : draft.certType === 'fire' ? 'Fire Alarm' : draft.certType === 'emlight' ? 'Emergency Lighting' : '';
         const startDate = new Date(draft.dateStarted).toLocaleDateString();
         const modDate = new Date(draft.lastModified).toLocaleDateString();
         return `
@@ -650,7 +660,21 @@ function startNewSession() {
 // ─── Step 1: Job Details ───────────────────────────────────────────────────
 
 const LIVE_CONDUCTOR_TYPES = ["1-Phase 2-Wire","2-Phase 3-Wire","3-Phase 3-Wire","3-Phase 4-Wire"];
-const SUPPLY_PROTECTIVE_DEVICES = ["BS 1361 Fuse HBC Type 2","BS 88-2 Fuse System G"];
+const SUPPLY_PROTECTIVE_DEVICES = [
+  "BS 1361 Fuse HBC Type 1",
+  "BS 1361 Fuse HBC Type 2",
+  "BS 88-2 Fuse System G",
+  "BS 88-3 Fuse",
+  "BS 3036 Fuse",
+  "MCCB",
+  "Isolator (no protection)",
+];
+const SUPPLY_PROTECTIVE_DEVICE_RATINGS = ["30A","40A","45A","60A","80A","100A","125A","160A","200A"];
+const MAIN_SWITCH_TYPES = ["Isolator","RCD","RCBO","Switch Disconnector"];
+const MAIN_SWITCH_RATINGS = ["40A","63A","80A","100A","125A","160A","200A"];
+const MAIN_SWITCH_POLES = ["1","2","3","4"];
+const MAIN_SWITCH_RCD_CURRENTS = ["10mA","30mA","100mA","300mA","500mA"];
+const MAIN_SWITCH_RCD_TYPES = ["Type A","Type AC","Type B"];
 
 function renderStep1() {
   const st = state, v = st.showVal;
@@ -659,7 +683,7 @@ function renderStep1() {
   return `
     <div class="header">
       <div class="logo">Job Details</div>
-      <div class="subtitle">${certLabel()} <span class="badge" style="background:${certColor()}">${st.certType.toUpperCase()}</span></div>
+      <div class="subtitle">${certLabel()} <span class="badge" style="background:${certColor()}">${certLabel()}</span></div>
     </div>
 
     <div class="part-label">Part 1 — Client &amp; Installation Address</div>
@@ -738,10 +762,17 @@ function renderStep1() {
         <div><label>PFC (kA)</label><input inputmode="decimal" data-field="pfc" oninput="s('pfc',this.value)" placeholder="e.g. 1.2"></div>
       </div>
 
-      <div class="field"><label>Supply Protective Device</label>
-        <select data-field="supplyProtectiveDevice" onchange="s('supplyProtectiveDevice',this.value)">
-          ${opts(SUPPLY_PROTECTIVE_DEVICES)}
-        </select>
+      <div class="row">
+        <div><label>Supply Protective Device</label>
+          <select data-field="supplyProtectiveDevice" onchange="s('supplyProtectiveDevice',this.value)">
+            ${opts(SUPPLY_PROTECTIVE_DEVICES)}
+          </select>
+        </div>
+        <div style="flex:0 0 100px"><label>Rating</label>
+          <select data-field="supplyProtectiveDeviceRating" onchange="s('supplyProtectiveDeviceRating',this.value)">
+            ${opts(SUPPLY_PROTECTIVE_DEVICE_RATINGS, "Select")}
+          </select>
+        </div>
       </div>
 
       <div class="divider"></div>
@@ -776,6 +807,57 @@ function renderStep1() {
         <button class="supply-btn${st.supplyPolarity==='na'?' sel':''}" onclick="set({supplyPolarity:'na'})">N/A</button>
         <button class="supply-btn${st.supplyPolarity==='lim'?' sel':''}" onclick="set({supplyPolarity:'lim'})">LIM</button>
       </div>
+
+      <div class="divider"></div>
+      <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px">Main Switch Details</div>
+      <div class="row">
+        <div><label>Type</label>
+          <select data-field="mainSwitchType" onchange="s('mainSwitchType',this.value);render()">
+            ${opts(MAIN_SWITCH_TYPES)}
+          </select>
+        </div>
+        <div style="flex:0 0 90px"><label>Rating</label>
+          <select data-field="mainSwitchRating" onchange="s('mainSwitchRating',this.value)">
+            ${opts(MAIN_SWITCH_RATINGS, "Select")}
+          </select>
+        </div>
+        <div style="flex:0 0 70px"><label>Poles</label>
+          <select data-field="mainSwitchPoles" onchange="s('mainSwitchPoles',this.value)">
+            ${opts(MAIN_SWITCH_POLES, "—")}
+          </select>
+        </div>
+      </div>
+      ${(st.mainSwitchType === 'RCD' || st.mainSwitchType === 'RCBO') ? `
+      <div class="row">
+        <div><label>RCD Operating Current</label>
+          <select data-field="mainSwitchRcdCurrent" onchange="s('mainSwitchRcdCurrent',this.value)">
+            ${opts(MAIN_SWITCH_RCD_CURRENTS, "Select")}
+          </select>
+        </div>
+        <div><label>RCD Type</label>
+          <select data-field="mainSwitchRcdType" onchange="s('mainSwitchRcdType',this.value)">
+            ${opts(MAIN_SWITCH_RCD_TYPES, "Select")}
+          </select>
+        </div>
+      </div>` : ''}
+
+      <div class="divider"></div>
+      <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px">Equipotential Bonding</div>
+      <div class="check-row" onclick="set({eqBondingPresent:!st.eqBondingPresent})">
+        <div class="check-box${st.eqBondingPresent?' checked':''}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></div>
+        <span class="check-label${st.eqBondingPresent?' checked':''}">Equipotential bonding present</span>
+      </div>
+      ${st.eqBondingPresent ? `
+      <div style="margin-top:8px;margin-left:32px">
+        <div style="font-size:12px;color:#475569;margin-bottom:6px;font-weight:600">Services bonded (tick all that apply):</div>
+        ${["Gas","Water","Oil","Structural Steel","Other"].map(svc => {
+          const checked = Array.isArray(st.eqBondingServices) && st.eqBondingServices.includes(svc);
+          return `<div class="check-row" onclick="toggleEqBondingService('${svc}')">
+            <div class="check-box${checked?' checked':''}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></div>
+            <span class="check-label${checked?' checked':''}">${svc}</span>
+          </div>`;
+        }).join('')}
+      </div>` : ''}
     </div>` : ''}
 
     ${eicr ? renderEICRSection() : ''}
@@ -1231,10 +1313,12 @@ function renderStep3() {
         ${isElec && s.certType!=='minor'?`<div><strong>Board:</strong> ${s.boardType.toUpperCase()}</div>`:''}
         ${isElec && s.ze?`<div><strong>Ze:</strong> ${s.ze}Ω</div>`:''}
         ${isElec && s.pfc?`<div><strong>PFC:</strong> ${s.pfc}kA</div>`:''}
-        ${isElec && s.supplyProtectiveDevice?`<div><strong>Protective Device:</strong> ${s.supplyProtectiveDevice}</div>`:''}
+        ${isElec && (s.supplyProtectiveDevice||s.supplyProtectiveDeviceRating)?`<div><strong>Protective Device:</strong> ${[s.supplyProtectiveDevice,s.supplyProtectiveDeviceRating].filter(Boolean).join(' ')}</div>`:''}
         ${isElec && s.supplyLiveConductors?`<div><strong>Live Conductors:</strong> ${s.supplyLiveConductors}</div>`:''}
         ${isElec && (s.supplyAC||s.supplyDC)?`<div><strong>Nature:</strong> AC: ${s.supplyAC||'—'} | DC: ${s.supplyDC||'—'}${s.supplyOther?' | Other: '+s.supplyOther:''}</div>`:''}
         ${isElec && s.supplyPolarity?`<div><strong>Polarity:</strong> ${s.supplyPolarity==='confirmed'?'✔ Confirmed':s.supplyPolarity==='na'?'N/A':'LIM'}</div>`:''}
+        ${isElec && s.mainSwitchType?`<div><strong>Main Switch:</strong> ${[s.mainSwitchType,s.mainSwitchRating,s.mainSwitchPoles?s.mainSwitchPoles+'-pole':''].filter(Boolean).join(' · ')}${(s.mainSwitchType==='RCD'||s.mainSwitchType==='RCBO')&&(s.mainSwitchRcdCurrent||s.mainSwitchRcdType)?' | '+[s.mainSwitchRcdCurrent,s.mainSwitchRcdType].filter(Boolean).join(' '):''}</div>`:''}
+        ${isElec && s.eqBondingPresent?`<div><strong>Eq. Bonding:</strong> ✔${Array.isArray(s.eqBondingServices)&&s.eqBondingServices.length?' — '+s.eqBondingServices.join(', '):''}</div>`:''}
         ${s.certType==='eicr'&&s.overallAssessment?`<div><strong>Assessment:</strong> <span style="color:${s.overallAssessment==='Satisfactory'?'#16a34a':'#dc2626'};font-weight:700">${s.overallAssessment}</span></div>`:''}
         ${isFire && fs.visitType?`<div><strong>Visit:</strong> ${fs.visitType}</div>`:''}
         ${isFire && fs.category?`<div><strong>Category:</strong> ${fs.category}</div>`:''}
@@ -1357,6 +1441,14 @@ function toggleInstallType(type) {
   render();
 }
 
+function toggleEqBondingService(service) {
+  if (!Array.isArray(state.eqBondingServices)) state.eqBondingServices = [];
+  const idx = state.eqBondingServices.indexOf(service);
+  if (idx === -1) state.eqBondingServices.push(service);
+  else state.eqBondingServices.splice(idx, 1);
+  render();
+}
+
 function validateStep1() {
   saveDraft();
   set({ step: 2, showVal: false });
@@ -1413,9 +1505,12 @@ function buildData() {
     data.supplyCharacteristics = {
       ze: s.ze, pfc: s.pfc,
       protectiveDevice: s.supplyProtectiveDevice,
+      protectiveDeviceRating: s.supplyProtectiveDeviceRating,
       liveConductors: s.supplyLiveConductors,
       ac: s.supplyAC, dc: s.supplyDC, other: s.supplyOther,
       polarity: s.supplyPolarity,
+      mainSwitch: { type: s.mainSwitchType, rating: s.mainSwitchRating, poles: s.mainSwitchPoles, rcdOperatingCurrent: s.mainSwitchRcdCurrent, rcdType: s.mainSwitchRcdType },
+      equipotentialBonding: s.eqBondingPresent ? { present: true, services: s.eqBondingServices || [] } : { present: false, services: [] },
     };
     data.circuits = s.circuits.map((c, i) => ({ number: i + 1, ...c }));
   }
