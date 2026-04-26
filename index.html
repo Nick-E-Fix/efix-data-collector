@@ -230,6 +230,7 @@ let state = {
   mainSwitchType: "", mainSwitchRating: "", mainSwitchPoles: "", mainSwitchHasRcd: false, mainSwitchRcdCurrent: "", mainSwitchRcdTimeDelay: "",
   eqBondingPresent: false, eqBondingServices: [],
   overallAssessment: "", observations: [],
+  jobNotes: "", jobPhotos: [],
   circuits: [blankCircuit()],
   selectedTemplate: null,
   expandedCircuit: 0,
@@ -360,6 +361,8 @@ function loadDraft(draftId) {
   if (!state.installTown) state.installTown = state.installSame ? (state.clientTown || "") : "";
   if (!state.installPostcode) state.installPostcode = state.installSame ? (state.clientPostcode || "") : "";
   if (state.existingComments === undefined) state.existingComments = "";
+  if (!state.jobNotes) state.jobNotes = "";
+  if (!state.jobPhotos) state.jobPhotos = [];
   if (!state.earthingArrangement) state.earthingArrangement = "";
   if (!state.earthElectrodeResistance) state.earthElectrodeResistance = "";
   if (!state.earthElectrodeLocation) state.earthElectrodeLocation = "";
@@ -755,7 +758,7 @@ function renderStep1() {
 
     <div class="section">
       <div class="field"><label>Comments on Existing Installation</label>
-        <textarea data-field="existingComments" oninput="s('existingComments',this.value)" placeholder="e.g. Existing wiring in good condition, consumer unit dated approx. 2010, no visible defects noted..."></textarea>
+        <textarea data-field="existingComments" oninput="s('existingComments',this.value)" placeholder="e.g. Old PVC wiring showing signs of deterioration, no RCD protection to sockets, consumer unit fuses only — no MCBs, several sockets cracked/damaged..."></textarea>
       </div>
     </div>
 
@@ -896,6 +899,34 @@ function renderStep1() {
     </div>` : ''}
 
     ${eicr ? renderEICRSection() : ''}
+
+    <div class="part-label">Job Notes &amp; Photos</div>
+
+    <div class="section">
+      <div class="field">
+        <label>Job Notes</label>
+        <textarea data-field="jobNotes" oninput="s('jobNotes',this.value)" placeholder="e.g. Customer advised to get consumer unit replaced. Access to roof space restricted. Recommend follow-up on bonding to gas meter..." rows="4"></textarea>
+      </div>
+      <div style="margin-top:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <span style="font-size:12px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Photos</span>
+          <label style="background:#2563eb;color:#fff;padding:6px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">
+            + Add Photo
+            <input type="file" accept="image/*" multiple style="display:none" onchange="addPhotos(this)">
+          </label>
+        </div>
+        ${st.jobPhotos.length === 0 ? '<div class="empty-msg">No photos added yet</div>' : `
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+          ${st.jobPhotos.map((p,i) => `
+            <div style="position:relative">
+              <img src="${p.data}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;display:block">
+              <button onclick="removePhoto(${i})" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center">×</button>
+              ${p.caption !== undefined ? `<input value="${p.caption}" oninput="updatePhotoCaption(${i},this.value)" placeholder="Caption..." style="width:100%;margin-top:4px;font-size:11px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:6px;box-sizing:border-box">` : ''}
+            </div>
+          `).join('')}
+        </div>`}
+      </div>
+    </div>
 
     <div class="btn-row">
       <button class="btn btn-grey" onclick="saveDraft();set({step:0})">← Back</button>
@@ -1345,6 +1376,8 @@ function renderStep3() {
         ${isElec && Array.isArray(s.installationType)&&s.installationType.length?`<div><strong>Type:</strong> ${s.installationType.join(', ')}</div>`:isElec && typeof s.installationType==='string'&&s.installationType?`<div><strong>Type:</strong> ${s.installationType}</div>`:''}
         ${s.description?`<div><strong>Work:</strong> ${s.description}</div>`:''}
         ${s.existingComments?`<div><strong>Existing:</strong> ${s.existingComments}</div>`:''}
+        ${s.jobNotes?`<div><strong>Notes:</strong> ${s.jobNotes}</div>`:''}
+        ${Array.isArray(s.jobPhotos)&&s.jobPhotos.length?`<div><strong>Photos:</strong> ${s.jobPhotos.length} attached</div>`:''}
         ${isElec && s.certType!=='minor'?`<div><strong>Board:</strong> ${s.boardType.toUpperCase()}</div>`:''}
         ${isElec && s.ze?`<div><strong>Ze:</strong> ${s.ze}Ω</div>`:''}
         ${isElec && s.pfc?`<div><strong>PFC:</strong> ${s.pfc}kA</div>`:''}
@@ -1474,6 +1507,33 @@ function toggleInstallType(type) {
   if (idx === -1) state.installationType.push(type);
   else state.installationType.splice(idx, 1);
   render();
+}
+
+function addPhotos(input) {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+  if (!Array.isArray(state.jobPhotos)) state.jobPhotos = [];
+  let loaded = 0;
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      state.jobPhotos.push({ data: e.target.result, caption: "" });
+      loaded++;
+      if (loaded === files.length) { saveDraft(); render(); }
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function removePhoto(idx) {
+  state.jobPhotos.splice(idx, 1);
+  saveDraft();
+  render();
+}
+
+function updatePhotoCaption(idx, val) {
+  if (state.jobPhotos[idx]) state.jobPhotos[idx].caption = val;
+  saveDraft();
 }
 
 function toggleEqBonding() {
@@ -1970,7 +2030,7 @@ function startNew() {
       clientName:"", clientAddress:"", clientTown:"", clientPostcode:"", clientPhone:"",
       installAddress:"", installSame:true, dateOfWork:new Date().toISOString().split("T")[0],
       installationType:[], description:"", boardType:"rcbo",
-      ze:"", pfc:"", overallAssessment:"", observations:[],
+      ze:"", pfc:"", overallAssessment:"", observations:[], jobNotes:"", jobPhotos:[],
       circuits:[blankCircuit()], selectedTemplate:null, expandedCircuit:0,
       fireSystem: blankFireSystem(), fireDevices: [blankFireDevice()], expandedFireDevice: 0,
       emlightSystem: blankEmlightSystem(), emlightFittings: [blankEmlightFitting()], expandedEmlightFitting: 0,
