@@ -150,6 +150,7 @@ const CIRCUIT_NAMES = [
   "UFH (Underfloor Heating)","Spur","FCU (Fused Connection Unit)",
 ];
 const INSTALL_TYPES = ["New installation","Addition to existing installation","Alteration to existing installation","Replacement consumer unit"];
+const EARTHING_ARRANGEMENTS = ["TN-C-S","TN-S","TT","IT"];
 
 // ─── Fire alarm data ──────────────────────────────────────────────────────
 const FIRE_DEVICE_TYPES = [
@@ -225,7 +226,7 @@ let state = {
   dateOfWork: new Date().toISOString().split("T")[0],
   installationType: [], description: "", boardType: "rcbo",
   existingComments: "",
-  ze: "", pfc: "", supplyLiveConductors: "", supplyAC: "", supplyDC: "", supplyOther: "", supplyPolarity: "", supplyProtectiveDevice: "", supplyProtectiveDeviceRating: "",
+  ze: "", pfc: "", earthingArrangement: "", earthElectrodeResistance: "", earthElectrodeLocation: "", earthElectrodeType: "", supplyLiveConductors: "", supplyAC: "", supplyDC: "", supplyOther: "", supplyPolarity: "", supplyProtectiveDevice: "", supplyProtectiveDeviceRating: "",
   mainSwitchType: "", mainSwitchRating: "", mainSwitchPoles: "", mainSwitchHasRcd: false, mainSwitchRcdCurrent: "", mainSwitchRcdTimeDelay: "",
   eqBondingPresent: false, eqBondingServices: [],
   overallAssessment: "", observations: [],
@@ -359,6 +360,10 @@ function loadDraft(draftId) {
   if (!state.installTown) state.installTown = state.installSame ? (state.clientTown || "") : "";
   if (!state.installPostcode) state.installPostcode = state.installSame ? (state.clientPostcode || "") : "";
   if (state.existingComments === undefined) state.existingComments = "";
+  if (!state.earthingArrangement) state.earthingArrangement = "";
+  if (!state.earthElectrodeResistance) state.earthElectrodeResistance = "";
+  if (!state.earthElectrodeLocation) state.earthElectrodeLocation = "";
+  if (!state.earthElectrodeType) state.earthElectrodeType = "";
   if (!state.supplyLiveConductors) state.supplyLiveConductors = "";
   if (!state.supplyAC) state.supplyAC = "";
   if (!state.supplyDC) state.supplyDC = "";
@@ -762,6 +767,30 @@ function renderStep1() {
         <div><label>Ze (Ω)</label><input inputmode="decimal" data-field="ze" oninput="s('ze',this.value)" placeholder="e.g. 0.35"></div>
         <div><label>PFC (kA)</label><input inputmode="decimal" data-field="pfc" oninput="s('pfc',this.value)" placeholder="e.g. 1.2"></div>
       </div>
+
+      <div class="field">
+        <label>Earthing Arrangement</label>
+        <select data-field="earthingArrangement" onchange="s('earthingArrangement',this.value)">
+          ${opts(EARTHING_ARRANGEMENTS, "Select")}
+        </select>
+      </div>
+
+      ${st.earthingArrangement === 'TT' ? `
+      <div class="divider"></div>
+      <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px">Earth Electrode (TT)</div>
+      <div class="row">
+        <div><label>Type</label>
+          <select data-field="earthElectrodeType" onchange="s('earthElectrodeType',this.value)">
+            ${opts(["Rod","Tape","Plate"], "Select")}
+          </select>
+        </div>
+        <div><label>Resistance (Ω)</label><input inputmode="decimal" data-field="earthElectrodeResistance" oninput="s('earthElectrodeResistance',this.value)" placeholder="e.g. 85"></div>
+      </div>
+      <div class="field">
+        <label>Electrode Location</label>
+        <input data-field="earthElectrodeLocation" oninput="s('earthElectrodeLocation',this.value)" placeholder="e.g. Front garden, 1m from boundary">
+      </div>
+      ` : ''}
 
       <div class="row">
         <div><label>Supply Protective Device</label>
@@ -1625,7 +1654,7 @@ function downloadPDF() {
   yPos += 2;
 
   // Supply Characteristics (electrical only)
-  if (isElecCT && (state.ze || state.pfc)) {
+  if (isElecCT && (state.ze || state.pfc || state.earthingArrangement)) {
     doc.setFont('helvetica', 'bold');
     doc.text('Supply Characteristics', margins.left, yPos);
     yPos += lineHeight;
@@ -1638,6 +1667,24 @@ function downloadPDF() {
     if (state.pfc) {
       doc.text(`PFC: ${state.pfc}kA`, margins.left, yPos);
       yPos += lineHeight;
+    }
+    if (state.earthingArrangement) {
+      doc.text(`Earthing Arrangement: ${state.earthingArrangement}`, margins.left, yPos);
+      yPos += lineHeight;
+    }
+    if (state.earthingArrangement === 'TT') {
+      if (state.earthElectrodeType) {
+        doc.text(`Earth Electrode Type: ${state.earthElectrodeType}`, margins.left, yPos);
+        yPos += lineHeight;
+      }
+      if (state.earthElectrodeResistance) {
+        doc.text(`Earth Electrode Resistance: ${state.earthElectrodeResistance}Ω`, margins.left, yPos);
+        yPos += lineHeight;
+      }
+      if (state.earthElectrodeLocation) {
+        doc.text(`Electrode Location: ${state.earthElectrodeLocation}`, margins.left, yPos);
+        yPos += lineHeight;
+      }
     }
     yPos += 2;
   }
