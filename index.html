@@ -305,12 +305,25 @@ function sef(idx, field, val) { state.emlightFittings[idx][field] = val; }
 function generateDraftId() { return Date.now().toString(); }
 
 function saveDraft() {
-  if (!state.certType) return; // Need at least a cert type selected
-  if (state.step === 0) return; // Don't auto-save on step 0
+  if (!state.certType) return;
+  if (state.step === 0) return;
 
   if (!state.draftId) {
     state.draftId = generateDraftId();
   }
+
+  // Save photos separately — base64 images are large and must not block circuit data saves
+  const photos = Array.isArray(state.jobPhotos) ? state.jobPhotos : [];
+  if (photos.length > 0) {
+    try {
+      localStorage.setItem('efix_photos_' + state.draftId, JSON.stringify(photos));
+    } catch(e) {
+      showToast("⚠️ Photos not saved — storage full");
+    }
+  }
+
+  // Build draft state without photo data (stored separately above)
+  const stateToSave = Object.assign({}, state, { jobPhotos: [] });
 
   const drafts = getDrafts();
   const existing = drafts[state.draftId];
@@ -321,7 +334,7 @@ function saveDraft() {
     dateStarted: existing ? existing.dateStarted : new Date().toISOString(),
     lastModified: new Date().toISOString(),
     step: state.step,
-    state: JSON.parse(JSON.stringify(state))
+    state: JSON.parse(JSON.stringify(stateToSave))
   };
 
   drafts[state.draftId] = draftData;
@@ -329,11 +342,17 @@ function saveDraft() {
   // Keep max 20 drafts
   const draftIds = Object.keys(drafts).sort((a, b) => parseInt(b) - parseInt(a));
   if (draftIds.length > 20) {
-    delete drafts[draftIds[draftIds.length - 1]];
+    const oldId = draftIds[draftIds.length - 1];
+    delete drafts[oldId];
+    try { localStorage.removeItem('efix_photos_' + oldId); } catch(e) {}
   }
 
-  try { localStorage.setItem('efix_drafts', JSON.stringify(drafts)); } catch(e) {}
-  showToast("Draft saved");
+  try {
+    localStorage.setItem('efix_drafts', JSON.stringify(drafts));
+    showToast("Draft saved");
+  } catch(e) {
+    showToast("⚠️ Save failed — storage full. Try clearing old drafts.");
+  }
 }
 
 function getDrafts() {
@@ -349,6 +368,11 @@ function loadDraft(draftId) {
   if (!draft) return;
 
   state = JSON.parse(JSON.stringify(draft.state));
+  // Restore photos from separate storage key
+  try {
+    const photos = localStorage.getItem('efix_photos_' + draftId);
+    state.jobPhotos = photos ? JSON.parse(photos) : [];
+  } catch(e) { state.jobPhotos = []; }
   // Back-fill fields added in later versions (safety for older drafts)
   if (!state.fireSystem) state.fireSystem = blankFireSystem();
   if (!state.fireDevices || !state.fireDevices.length) state.fireDevices = [blankFireDevice()];
@@ -389,6 +413,7 @@ function deleteDraft(draftId) {
   const drafts = getDrafts();
   delete drafts[draftId];
   try { localStorage.setItem('efix_drafts', JSON.stringify(drafts)); } catch(e) {}
+  try { localStorage.removeItem('efix_photos_' + draftId); } catch(e) {}
   if (state.draftId === draftId) {
     state.draftId = null;
   }
@@ -410,9 +435,14 @@ function setupAutoSave() {
     if (autoSaveTimer) clearInterval(autoSaveTimer);
     autoSaveTimer = setInterval(() => {
       if (state.step > 0) saveDraft();
-    }, 10000);
+    }, 5000);
   }
 }
+
+// Save immediately when iOS/Android sends the PWA to the background
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && state.step > 0) saveDraft();
+});
 
 // ─── Postcode Lookup ───────────────────────────────────────────────────────
 
@@ -1509,19 +1539,38 @@ function toggleInstallType(type) {
   render();
 }
 
+function compressPhoto(file, callback) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 1200;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      callback(canvas.toDataURL('image/jpeg', 0.75));
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 function addPhotos(input) {
   const files = Array.from(input.files);
   if (!files.length) return;
   if (!Array.isArray(state.jobPhotos)) state.jobPhotos = [];
   let loaded = 0;
   files.forEach(file => {
-    const reader = new FileReader();
-    reader.onload = e => {
-      state.jobPhotos.push({ data: e.target.result, caption: "" });
+    compressPhoto(file, dataUrl => {
+      state.jobPhotos.push({ data: dataUrl, caption: "" });
       loaded++;
       if (loaded === files.length) { saveDraft(); render(); }
-    };
-    reader.readAsDataURL(file);
+    });
   });
 }
 
