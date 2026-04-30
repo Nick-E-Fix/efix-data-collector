@@ -225,6 +225,8 @@ let state = {
   installStreet: "", installTown: "", installPostcode: "",
   dateOfWork: new Date().toISOString().split("T")[0],
   installationType: [], description: "", boardType: "rcbo",
+  reportPurpose: "", previousReportAvailable: "", recordsAvailable: "",
+  estimatedInstallAge: "", installationCategory: "", evidenceOfAlterations: "", alterationsEstimatedAge: "",
   existingComments: "",
   ze: "", pfc: "", earthingArrangement: "", earthElectrodeResistance: "", earthElectrodeLocation: "", earthElectrodeType: "", supplyLiveConductors: "", supplyAC: "", supplyDC: "", supplyOther: "", supplyPolarity: "", supplyProtectiveDevice: "", supplyProtectiveDeviceRating: "",
   mainSwitchType: "", mainSwitchRating: "", mainSwitchPoles: "", mainSwitchHasRcd: false, mainSwitchRcdCurrent: "", mainSwitchRcdTimeDelay: "",
@@ -406,6 +408,14 @@ function loadDraft(draftId) {
   if (!state.mainSwitchRcdTimeDelay) state.mainSwitchRcdTimeDelay = "";
   if (state.eqBondingPresent === undefined) state.eqBondingPresent = false;
   if (!state.eqBondingServices) state.eqBondingServices = [];
+  // Back-fill EICR Part 2 fields
+  if (!state.reportPurpose) state.reportPurpose = "";
+  if (!state.previousReportAvailable) state.previousReportAvailable = "";
+  if (!state.recordsAvailable) state.recordsAvailable = "";
+  if (!state.estimatedInstallAge) state.estimatedInstallAge = "";
+  if (!state.installationCategory) state.installationCategory = "";
+  if (!state.evidenceOfAlterations) state.evidenceOfAlterations = "";
+  if (!state.alterationsEstimatedAge) state.alterationsEstimatedAge = "";
   render();
 }
 
@@ -769,17 +779,45 @@ function renderStep1() {
     <div class="part-label">Part 2 — Date &amp; Works</div>
 
     <div class="section">
-      <div class="field"><label>Date of Work *</label>
+      <div class="field"><label>Date of Inspection / Work *</label>
         <input type="date" data-field="dateOfWork" oninput="s('dateOfWork',this.value)"></div>
-      ${!isFireOrEm ? `<div class="field"><label>Installation Type (tick all that apply)</label>
-        ${INSTALL_TYPES.map(t => {
-          const checked = Array.isArray(st.installationType) && st.installationType.includes(t);
-          return `<div class="check-row" onclick="toggleInstallType('${t}')">
-            <div class="check-box${checked?' checked':''}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></div>
-            <span class="check-label${checked?' checked':''}">${t}</span>
-          </div>`;
-        }).join("")}
-      </div>` : ''}
+
+      ${eicr ? `
+      <div class="field"><label>Purpose of Report</label>
+        <input data-field="reportPurpose" oninput="s('reportPurpose',this.value)" placeholder="e.g. Change of occupancy / Periodic inspection"></div>
+
+      <div class="field"><label>Previous Report Available</label>
+        <div class="row" style="gap:8px;flex-wrap:wrap">
+          ${['✓ Yes','N/A'].map(opt => { const val = opt==='✓ Yes'?'yes':'na'; return `<button class="btn ${st.previousReportAvailable===val?'btn-blue':'btn-grey'}" style="flex:1;min-width:80px" onclick="set({previousReportAvailable:'${st.previousReportAvailable===val?'':val}'})"><span style="pointer-events:none">${opt}</span></button>`; }).join('')}
+        </div>
+      </div>
+
+      <div class="field"><label>Records Available</label>
+        <div class="row" style="gap:8px;flex-wrap:wrap">
+          ${['✓ Yes','N/A'].map(opt => { const val = opt==='✓ Yes'?'yes':'na'; return `<button class="btn ${st.recordsAvailable===val?'btn-blue':'btn-grey'}" style="flex:1;min-width:80px" onclick="set({recordsAvailable:'${st.recordsAvailable===val?'':val}'})"><span style="pointer-events:none">${opt}</span></button>`; }).join('')}
+        </div>
+      </div>
+
+      <div class="field"><label>Estimated Age of Installation</label>
+        <input data-field="estimatedInstallAge" oninput="s('estimatedInstallAge',this.value)" placeholder="e.g. 20 years"></div>
+
+      <div class="field"><label>Type of Installation</label>
+        <select data-field="installationCategory" onchange="s('installationCategory',this.value)">
+          ${opts(["Dwelling","Commercial","Industrial","Other"], "Select")}
+        </select>
+      </div>
+
+      <div class="field"><label>Evidence of Alterations or Additions</label>
+        <div class="row" style="gap:8px;flex-wrap:wrap">
+          ${['Yes','No'].map(opt => { const val = opt.toLowerCase(); return `<button class="btn ${st.evidenceOfAlterations===val?'btn-blue':'btn-grey'}" style="flex:1;min-width:80px" onclick="set({evidenceOfAlterations:'${st.evidenceOfAlterations===val?'':val}'})"><span style="pointer-events:none">${opt}</span></button>`; }).join('')}
+        </div>
+      </div>
+      ${st.evidenceOfAlterations === 'yes' ? `
+      <div class="field"><label>Estimated Age of Alterations</label>
+        <input data-field="alterationsEstimatedAge" oninput="s('alterationsEstimatedAge',this.value)" placeholder="e.g. 5 years"></div>
+      ` : ''}
+      ` : ''}
+
       <div class="field"><label>Description of Work</label>
         <input data-field="description" oninput="s('description',this.value)" placeholder="${eicr?'e.g. Periodic inspection & testing':st.certType==='minor'?'e.g. Install additional socket outlet':st.certType==='fire'?'e.g. Annual service of L2 fire alarm system':st.certType==='emlight'?'e.g. Annual 3-hour emergency lighting test':'e.g. New consumer unit and full rewire'}"></div>
     </div>
@@ -1403,7 +1441,12 @@ function renderStep3() {
         ${s.clientPhone?`<div><strong>Phone:</strong> ${s.clientPhone}</div>`:''}
         ${s.installStreet||s.installTown||s.installPostcode?`<div><strong>Install Address:</strong> ${s.installStreet}${s.installTown?', '+s.installTown:''} ${s.installPostcode}</div>`:''}
         <div><strong>Date:</strong> ${s.dateOfWork}</div>
-        ${isElec && Array.isArray(s.installationType)&&s.installationType.length?`<div><strong>Type:</strong> ${s.installationType.join(', ')}</div>`:isElec && typeof s.installationType==='string'&&s.installationType?`<div><strong>Type:</strong> ${s.installationType}</div>`:''}
+        ${s.certType==='eicr'&&s.reportPurpose?`<div><strong>Purpose:</strong> ${s.reportPurpose}</div>`:''}
+        ${s.certType==='eicr'&&s.previousReportAvailable?`<div><strong>Previous Report:</strong> ${s.previousReportAvailable==='yes'?'✓ Yes':'N/A'}</div>`:''}
+        ${s.certType==='eicr'&&s.recordsAvailable?`<div><strong>Records:</strong> ${s.recordsAvailable==='yes'?'✓ Yes':'N/A'}</div>`:''}
+        ${s.certType==='eicr'&&s.estimatedInstallAge?`<div><strong>Install Age:</strong> ${s.estimatedInstallAge}</div>`:''}
+        ${s.certType==='eicr'&&s.installationCategory?`<div><strong>Installation Type:</strong> ${s.installationCategory}</div>`:''}
+        ${s.certType==='eicr'&&s.evidenceOfAlterations?`<div><strong>Alterations:</strong> ${s.evidenceOfAlterations==='yes'?'Yes'+(s.alterationsEstimatedAge?' ('+s.alterationsEstimatedAge+')':''):'No'}</div>`:''}
         ${s.description?`<div><strong>Work:</strong> ${s.description}</div>`:''}
         ${s.existingComments?`<div><strong>Existing:</strong> ${s.existingComments}</div>`:''}
         ${s.jobNotes?`<div><strong>Notes:</strong> ${s.jobNotes}</div>`:''}
@@ -1646,7 +1689,16 @@ function buildData() {
       dateOfWork: s.dateOfWork,
       description: s.description,
       existingComments: s.existingComments,
-      ...(isElec ? { installationType: s.installationType, boardType: s.boardType } : {}),
+      ...(isElec ? { boardType: s.boardType } : {}),
+      ...(s.certType==='eicr' ? {
+        reportPurpose: s.reportPurpose,
+        previousReportAvailable: s.previousReportAvailable,
+        recordsAvailable: s.recordsAvailable,
+        estimatedInstallAge: s.estimatedInstallAge,
+        installationCategory: s.installationCategory,
+        evidenceOfAlterations: s.evidenceOfAlterations,
+        alterationsEstimatedAge: s.evidenceOfAlterations==='yes' ? s.alterationsEstimatedAge : "",
+      } : {}),
     },
   };
 
@@ -1750,7 +1802,12 @@ function downloadPDF() {
     `Client: ${state.clientName}`,
     `Address: ${state.clientAddress}${state.clientTown ? ', ' + state.clientTown : ''} ${state.clientPostcode}`,
     ...(state.clientPhone ? [`Phone: ${state.clientPhone}`] : []),
-    ...(isElecCT && Array.isArray(state.installationType)&&state.installationType.length ? [`Installation Type: ${state.installationType.join(', ')}`] : isElecCT && typeof state.installationType==='string'&&state.installationType ? [`Installation Type: ${state.installationType}`] : []),
+    ...(state.certType==='eicr'&&state.reportPurpose ? [`Purpose: ${state.reportPurpose}`] : []),
+    ...(state.certType==='eicr'&&state.previousReportAvailable ? [`Previous Report: ${state.previousReportAvailable==='yes'?'Yes':'N/A'}`] : []),
+    ...(state.certType==='eicr'&&state.recordsAvailable ? [`Records Available: ${state.recordsAvailable==='yes'?'Yes':'N/A'}`] : []),
+    ...(state.certType==='eicr'&&state.estimatedInstallAge ? [`Est. Age of Installation: ${state.estimatedInstallAge}`] : []),
+    ...(state.certType==='eicr'&&state.installationCategory ? [`Installation Type: ${state.installationCategory}`] : []),
+    ...(state.certType==='eicr'&&state.evidenceOfAlterations ? [`Evidence of Alterations: ${state.evidenceOfAlterations==='yes'?'Yes'+(state.alterationsEstimatedAge?' ('+state.alterationsEstimatedAge+')':''):'No'}`] : []),
     ...(state.description ? [`Work Description: ${state.description}`] : []),
     ...(isElecCT && state.certType !== 'minor' ? [`Board Type: ${state.boardType.toUpperCase()}`] : []),
   ];
@@ -2079,6 +2136,8 @@ function startNew() {
       clientName:"", clientAddress:"", clientTown:"", clientPostcode:"", clientPhone:"",
       installAddress:"", installSame:true, dateOfWork:new Date().toISOString().split("T")[0],
       installationType:[], description:"", boardType:"rcbo",
+      reportPurpose:"", previousReportAvailable:"", recordsAvailable:"",
+      estimatedInstallAge:"", installationCategory:"", evidenceOfAlterations:"", alterationsEstimatedAge:"",
       ze:"", pfc:"", overallAssessment:"", observations:[], jobNotes:"", jobPhotos:[],
       circuits:[blankCircuit()], selectedTemplate:null, expandedCircuit:0,
       fireSystem: blankFireSystem(), fireDevices: [blankFireDevice()], expandedFireDevice: 0,
