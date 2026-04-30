@@ -9,17 +9,31 @@
 <title>E-Fix Data Collector</title>
 <!-- jsPDF loaded on demand when user taps Download PDF -->
 <style>
-  :root { --blue: #3b82f6; --red: #dc2626; --green: #16a34a; --dark: #1e293b; --grey: #64748b; --light: #f8fafc; --border: #e2e8f0; }
+  :root {
+    --blue: #3b82f6; --red: #dc2626; --green: #16a34a; --grey: #64748b;
+    --dark: #1e293b; --light: #f8fafc; --border: #e2e8f0;
+    --bg: #f8fafc; --card: #ffffff; --card2: #fafbfc; --subtle: #f1f5f9;
+    --heading: #334155; --label: #475569;
+    --input-bg: #ffffff; --shadow: rgba(0,0,0,0.10);
+    --nav-bg: rgba(255,255,255,0.97); --nav-shadow: rgba(0,0,0,0.08);
+  }
+  body[data-theme="dark"] {
+    --bg: #0f172a; --card: #1e293b; --card2: #162032; --subtle: #253347;
+    --heading: #e2e8f0; --label: #94a3b8;
+    --border: #334155; --light: #0f172a; --dark: #f1f5f9;
+    --input-bg: #162032; --shadow: rgba(0,0,0,0.35);
+    --nav-bg: rgba(15,23,42,0.98); --nav-shadow: rgba(0,0,0,0.45);
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--light); color: var(--dark); max-width: 480px; margin: 0 auto; padding: 12px 16px; min-height: 100vh; padding-bottom: 80px; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--dark); max-width: 480px; margin: 0 auto; padding: 12px 16px; min-height: 100vh; padding-bottom: 96px; }
   .header { text-align: center; padding: 16px 0 12px; border-bottom: 2px solid var(--border); margin-bottom: 16px; }
   .logo { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
   .logo-svg { display: inline-block; max-width: 180px; margin-bottom: 8px; }
   .subtitle { font-size: 12px; color: var(--grey); margin-top: 2px; }
-  .section { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 12px; border: 1px solid var(--border); }
-  .section-title { font-size: 14px; font-weight: 700; color: #334155; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
-  label { font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 4px; display: block; }
-  input, select, textarea { width: 100%; padding: 10px 12px; border-radius: 8px; font-size: 15px; border: 1.5px solid var(--border); background: #fff; outline: none; -webkit-appearance: none; appearance: none; color: var(--dark); }
+  .section { background: var(--card); border-radius: 12px; padding: 16px; margin-bottom: 12px; border: 1px solid var(--border); }
+  .section-title { font-size: 14px; font-weight: 700; color: var(--heading); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  label { font-size: 12px; font-weight: 600; color: var(--label); margin-bottom: 4px; display: block; }
+  input, select, textarea { width: 100%; padding: 10px 12px; border-radius: 8px; font-size: 15px; border: 1.5px solid var(--border); background: var(--input-bg); outline: none; -webkit-appearance: none; appearance: none; color: var(--dark); }
   input:focus, select:focus, textarea:focus { border-color: var(--blue); }
   input.err, select.err { border-color: #f87171; background: #fef2f2; }
   textarea { resize: vertical; min-height: 60px; }
@@ -30,11 +44,11 @@
   .btn-blue { background: var(--blue); }
   .btn-dark { background: var(--dark); }
   .btn-purple { background: #7c3aed; }
-  .btn-grey { background: var(--border); color: #475569; }
+  .btn-grey { background: var(--subtle); color: var(--label); }
   .btn-sm { padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; border: none; cursor: pointer; }
   .btn-row { display: flex; gap: 8px; margin-bottom: 20px; }
   .btn-row > * { flex: 1; }
-  .cert-card { border: 2px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; cursor: pointer; background: #fff; transition: all 0.15s ease; }
+  .cert-card { border: 2px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; cursor: pointer; background: var(--card); transition: all 0.15s ease; }
   .cert-card.sel { background: #fef2f2; }
   .cert-card.sel-green { background: #f0fdf4; }
   .cert-card.sel-amber { background: #fffbeb; }
@@ -50,23 +64,23 @@
   .toggle.on { background: var(--blue); }
   .toggle-dot { width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
   .toggle.on .toggle-dot { transform: translateX(20px); }
-  .toggle-label { font-size: 13px; font-weight: 500; color: #475569; }
-  .circuit-hdr { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #fff; border-radius: 8px; cursor: pointer; border: 1px solid var(--border); margin-bottom: 6px; }
-  .circuit-hdr.open { background: #f1f5f9; margin-bottom: 0; border-radius: 8px 8px 0 0; }
-  .circuit-body { padding: 12px 14px; border: 1px solid var(--border); border-top: none; border-radius: 0 0 8px 8px; margin-bottom: 6px; background: #fafbfc; }
+  .toggle-label { font-size: 13px; font-weight: 500; color: var(--label); }
+  .circuit-hdr { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--card); border-radius: 8px; cursor: pointer; border: 1px solid var(--border); margin-bottom: 6px; }
+  .circuit-hdr.open { background: var(--subtle); margin-bottom: 0; border-radius: 8px 8px 0 0; }
+  .circuit-body { padding: 12px 14px; border: 1px solid var(--border); border-top: none; border-radius: 0 0 8px 8px; margin-bottom: 6px; background: var(--card2); }
   .circuit-num { font-size: 13px; font-weight: 700; color: var(--blue); background: #eff6ff; border-radius: 6px; padding: 2px 8px; }
   .circuit-desc { font-size: 13px; color: var(--grey); margin-left: 8px; }
-  .tpl-card { border: 2px solid var(--border); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; cursor: pointer; background: #fff; }
+  .tpl-card { border: 2px solid var(--border); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; cursor: pointer; background: var(--card); }
   .tpl-card.sel { border-color: var(--blue); background: #eff6ff; }
-  .tpl-label { font-size: 14px; font-weight: 600; color: #334155; }
+  .tpl-label { font-size: 14px; font-weight: 600; color: var(--heading); }
   .tpl-sub { font-size: 11px; color: var(--grey); margin-top: 2px; }
   .board-btn { flex: 1; text-align: center; padding: 8px 6px; border-radius: 8px; font-size: 12px; font-weight: 600; border: none; cursor: pointer; background: #f1f5f9; color: #475569; }
   .board-btn.sel { background: var(--blue); color: #fff; }
   .assess-btn { flex: 1; text-align: center; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: 600; border: none; cursor: pointer; }
-  .obs-card { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 8px; }
-  .summary-line { font-size: 13px; line-height: 1.8; color: #475569; }
-  .summary-line strong { color: #334155; }
-  .circuit-summary { font-size: 13px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; color: #475569; }
+  .obs-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+  .summary-line { font-size: 13px; line-height: 1.8; color: var(--label); }
+  .summary-line strong { color: var(--heading); }
+  .circuit-summary { font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--subtle); color: var(--label); }
   .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--dark); color: #fff; padding: 10px 20px; border-radius: 10px; font-size: 14px; font-weight: 600; z-index: 999; box-shadow: 0 4px 12px rgba(0,0,0,0.2); display: none; }
   .toast.show { display: block; animation: fadeInOut 2s ease; }
   @keyframes fadeInOut { 0% { opacity: 0; transform: translateX(-50%) translateY(10px); } 10% { opacity: 1; transform: translateX(-50%) translateY(0); } 80% { opacity: 1; } 100% { opacity: 0; } }
@@ -78,22 +92,22 @@
   .pc-row { display: flex; gap: 6px; margin-bottom: 10px; }
   .pc-row input { flex: 1; }
   .pc-row button { flex-shrink: 0; width: auto; padding: 10px 14px; }
-  .addr-list { max-height: 200px; overflow-y: auto; border: 1.5px solid var(--blue); border-radius: 8px; margin-bottom: 10px; background: #fff; }
+  .addr-list { max-height: 200px; overflow-y: auto; border: 1.5px solid var(--blue); border-radius: 8px; margin-bottom: 10px; background: var(--card); }
   .addr-item { padding: 10px 12px; font-size: 14px; color: var(--dark); cursor: pointer; border-bottom: 1px solid var(--border); }
   .addr-item:last-child { border-bottom: none; }
   .addr-item:active { background: #eff6ff; }
   .pc-status { font-size: 12px; color: var(--grey); margin-bottom: 8px; text-align: center; }
   .pc-status.error { color: var(--red); }
   .combo-wrap { position: relative; }
-  .combo-list { position: absolute; left: 0; right: 0; top: 100%; max-height: 200px; overflow-y: auto; background: #fff; border: 1.5px solid var(--blue); border-top: none; border-radius: 0 0 8px 8px; z-index: 50; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  .combo-list { position: absolute; left: 0; right: 0; top: 100%; max-height: 200px; overflow-y: auto; background: var(--card); border: 1.5px solid var(--blue); border-top: none; border-radius: 0 0 8px 8px; z-index: 50; display: none; box-shadow: 0 4px 12px var(--shadow); }
   .combo-list.open { display: block; }
   .combo-item { padding: 10px 12px; font-size: 14px; cursor: pointer; border-bottom: 1px solid var(--border); }
   .combo-item:last-child { border-bottom: none; }
   .combo-item:active, .combo-item:hover { background: #eff6ff; }
-  .draft-card { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; background: #fff; display: flex; justify-content: space-between; align-items: flex-start; cursor: pointer; transition: all 0.15s ease; }
-  .draft-card:active { background: #f8fafc; }
+  .draft-card { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; background: var(--card); display: flex; justify-content: space-between; align-items: flex-start; cursor: pointer; transition: all 0.15s ease; }
+  .draft-card:active { background: var(--subtle); }
   .draft-info { flex: 1; }
-  .draft-name { font-size: 14px; font-weight: 600; color: var(--dark); }
+  .draft-name { font-size: 14px; font-weight: 600; color: var(--heading); }
   .draft-meta { font-size: 12px; color: var(--grey); margin-top: 4px; }
   .draft-badge { font-size: 10px; font-weight: 700; color: #fff; border-radius: 4px; padding: 2px 6px; display: inline-block; margin-right: 6px; }
   .draft-delete { background: #fee2e2; color: var(--red); border: none; font-weight: 700; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 16px; flex-shrink: 0; margin-left: 8px; }
@@ -101,22 +115,35 @@
   .drafts-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
   .clear-all-btn { background: none; border: none; color: #64748b; font-size: 12px; cursor: pointer; text-decoration: underline; }
   .check-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
-  .check-box { width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--border); background: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: all 0.15s; }
+  .check-box { width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--border); background: var(--input-bg); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: all 0.15s; }
   .check-box.checked { background: var(--blue); border-color: var(--blue); }
   .check-box svg { display: none; }
   .check-box.checked svg { display: block; }
-  .check-label { font-size: 14px; color: #475569; cursor: pointer; }
+  .check-label { font-size: 14px; color: var(--label); cursor: pointer; }
   .check-label.checked { color: var(--dark); font-weight: 600; }
-  .part-label { font-size: 11px; font-weight: 700; color: var(--blue); text-transform: uppercase; letter-spacing: 1px; margin: 16px 0 6px; padding-left: 4px; border-left: 3px solid var(--blue); padding-left: 8px; }
-  .supply-btn { flex: 1; text-align: center; padding: 10px 8px; border-radius: 8px; font-size: 14px; font-weight: 600; border: none; cursor: pointer; background: #f1f5f9; color: #475569; }
+  .part-label { font-size: 11px; font-weight: 700; color: var(--blue); text-transform: uppercase; letter-spacing: 1px; margin: 16px 0 6px; border-left: 3px solid var(--blue); padding-left: 8px; }
+  .supply-btn { flex: 1; text-align: center; padding: 10px 8px; border-radius: 8px; font-size: 14px; font-weight: 600; border: none; cursor: pointer; background: var(--subtle); color: var(--label); }
   .supply-btn.sel { background: var(--blue); color: #fff; }
   .supply-btn.sel-green { background: var(--green); color: #fff; }
+  /* Dark mode select arrow */
+  body[data-theme="dark"] select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); }
+  /* Floating nav bar */
+  #nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 100; display: flex; justify-content: center; }
+  .nav-bar { display: flex; align-items: center; gap: 8px; width: 100%; max-width: 480px; padding: 10px 16px 28px; background: var(--nav-bg); border-top: 1px solid var(--border); box-shadow: 0 -4px 20px var(--nav-shadow); backdrop-filter: saturate(180%) blur(10px); -webkit-backdrop-filter: saturate(180%) blur(10px); }
+  .nav-btn { flex: 1; padding: 12px 0; border-radius: 10px; font-size: 15px; font-weight: 600; border: none; cursor: pointer; text-align: center; transition: opacity 0.15s; }
+  .nav-btn:active { opacity: 0.75; }
+  .nav-home { flex: 0 0 48px !important; width: 48px; font-size: 19px; background: var(--subtle); color: var(--label); border: 1.5px solid var(--border); border-radius: 10px; }
+  body[data-theme="dark"] .nav-home { background: var(--card2); }
+  /* Theme toggle button */
+  .theme-toggle { position: fixed; top: 14px; right: 16px; width: 36px; height: 36px; border-radius: 50%; background: var(--card); border: 1.5px solid var(--border); font-size: 17px; cursor: pointer; z-index: 200; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px var(--shadow); transition: background 0.2s; -webkit-tap-highlight-color: transparent; }
 </style>
 </head>
 <body>
 
+<button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="Toggle dark mode">☀️</button>
 <div id="app"></div>
 <div class="toast" id="toast"></div>
+<div id="nav"></div>
 
 <script>
 // ─── Data ──────────────────────────────────────────────────────────────────
@@ -617,6 +644,7 @@ function render() {
   else if (state.step === 3) app.innerHTML = renderStep3();
   restoreValues();
   setupAutoSave();
+  renderNav();
 }
 
 function restoreValues() {
@@ -670,8 +698,6 @@ function renderStep0() {
         <div class="cert-desc">${t.desc}</div>
       </div>
     `).join("")}
-    ${state.certType ? `<button class="btn btn-blue" onclick="startNewSession()">Next →</button>` : ""}
-
     ${hasDrafts ? `
     <div class="drafts-section">
       <div class="divider" style="margin:16px 0"></div>
@@ -996,10 +1022,6 @@ function renderStep1() {
       </div>
     </div>
 
-    <div class="btn-row">
-      <button class="btn btn-grey" onclick="saveDraft();set({step:0})">← Back</button>
-      <button class="btn btn-blue" onclick="validateStep1()">Next →</button>
-    </div>
   `;
 }
 
@@ -1077,10 +1099,6 @@ function renderStep2() {
       ${s.circuits.map((c,i) => renderCircuit(c,i)).join("")}
     </div>
 
-    <div class="btn-row">
-      <button class="btn btn-grey" onclick="saveDraft();set({step:1})">← Back</button>
-      <button class="btn btn-blue" onclick="saveDraft();set({step:3})">Review →</button>
-    </div>
   `;
 }
 
@@ -1265,11 +1283,6 @@ function renderStep2Fire() {
       <div class="field"><label>Overall Notes</label>
         <input data-field="overallNotes" data-scope="fireSystem" oninput="sfs('overallNotes',this.value)" placeholder="e.g. Recommend full replacement within 12 months"></div>
     </div>
-
-    <div class="btn-row">
-      <button class="btn btn-grey" onclick="saveDraft();set({step:1})">← Back</button>
-      <button class="btn btn-blue" onclick="saveDraft();set({step:3})">Review →</button>
-    </div>
   `;
 }
 
@@ -1358,11 +1371,6 @@ function renderStep2Emlight() {
       </div>
       <div class="field"><label>Overall Notes</label>
         <input data-field="overallNotes" data-scope="emlightSystem" oninput="ses('overallNotes',this.value)" placeholder="e.g. Two fittings to be replaced next visit"></div>
-    </div>
-
-    <div class="btn-row">
-      <button class="btn btn-grey" onclick="saveDraft();set({step:1})">← Back</button>
-      <button class="btn btn-blue" onclick="saveDraft();set({step:3})">Review →</button>
     </div>
   `;
 }
@@ -1545,10 +1553,6 @@ function renderStep3() {
       <button class="btn btn-dark" onclick="downloadJSON()">Download JSON File</button>
     </div>
 
-    <div class="btn-row">
-      <button class="btn btn-grey" onclick="set({step:2})">← Edit Circuits</button>
-      <button class="btn btn-grey" onclick="startNew()">Start New</button>
-    </div>
   `;
 }
 
@@ -2147,7 +2151,66 @@ function startNew() {
   }
 }
 
+// ─── Theme ─────────────────────────────────────────────────────────────────
+function initTheme() {
+  const saved = localStorage.getItem('efix_theme') || 'light';
+  document.body.setAttribute('data-theme', saved);
+  const btn = document.getElementById('themeToggle');
+  if (btn) btn.textContent = saved === 'dark' ? '☀️' : '🌙';
+}
+function toggleTheme() {
+  const current = document.body.getAttribute('data-theme') || 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.body.setAttribute('data-theme', next);
+  localStorage.setItem('efix_theme', next);
+  const btn = document.getElementById('themeToggle');
+  if (btn) btn.textContent = next === 'dark' ? '☀️' : '🌙';
+}
+
+// ─── Nav bar ───────────────────────────────────────────────────────────────
+function goHome() {
+  if (state.step > 0) saveDraft();
+  set({ step: 0 });
+}
+
+function renderNav() {
+  const nav = document.getElementById('nav');
+  if (!nav) return;
+  const s = state.step;
+  let html = '';
+
+  if (s === 0) {
+    // Cert selection screen — just Next if a cert is chosen
+    if (state.certType) {
+      html = `<div class="nav-bar">
+        <button class="nav-btn btn-blue" onclick="startNewSession()">Next →</button>
+      </div>`;
+    }
+  } else if (s === 1) {
+    html = `<div class="nav-bar">
+      <button class="nav-btn btn-grey" onclick="saveDraft();set({step:0})">← Back</button>
+      <button class="nav-btn nav-home" onclick="goHome()" title="Home">🏠</button>
+      <button class="nav-btn btn-blue" onclick="validateStep1()">Next →</button>
+    </div>`;
+  } else if (s === 2) {
+    html = `<div class="nav-bar">
+      <button class="nav-btn btn-grey" onclick="saveDraft();set({step:1})">← Back</button>
+      <button class="nav-btn nav-home" onclick="goHome()" title="Home">🏠</button>
+      <button class="nav-btn btn-blue" onclick="saveDraft();set({step:3})">Review →</button>
+    </div>`;
+  } else if (s === 3) {
+    html = `<div class="nav-bar">
+      <button class="nav-btn btn-grey" onclick="saveDraft();set({step:2})">← Back</button>
+      <button class="nav-btn nav-home" onclick="goHome()" title="Home">🏠</button>
+      <button class="nav-btn btn-blue" onclick="startNew()">Start New</button>
+    </div>`;
+  }
+
+  nav.innerHTML = html;
+}
+
 // ─── Init ──────────────────────────────────────────────────────────────────
+initTheme();
 render();
 </script>
 </body>
