@@ -81,7 +81,7 @@
   .summary-line { font-size: 13px; line-height: 1.8; color: var(--label); }
   .summary-line strong { color: var(--heading); }
   .circuit-summary { font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--subtle); color: var(--label); }
-  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--dark); color: #fff; padding: 10px 20px; border-radius: 10px; font-size: 14px; font-weight: 600; z-index: 999; box-shadow: 0 4px 12px rgba(0,0,0,0.2); display: none; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1e293b; color: #fff; padding: 10px 20px; border-radius: 10px; font-size: 14px; font-weight: 600; z-index: 999; box-shadow: 0 4px 12px rgba(0,0,0,0.35); display: none; }
   .toast.show { display: block; animation: fadeInOut 2s ease; }
   @keyframes fadeInOut { 0% { opacity: 0; transform: translateX(-50%) translateY(10px); } 10% { opacity: 1; transform: translateX(-50%) translateY(0); } 80% { opacity: 1; } 100% { opacity: 0; } }
   .empty-msg { font-size: 13px; color: #94a3b8; text-align: center; padding: 12px; }
@@ -459,6 +459,11 @@ function deleteDraft(draftId) {
 
 function clearAllDrafts() {
   if (confirm("Delete all saved drafts? This cannot be undone.")) {
+    // Clean up photo storage for every draft before removing the index
+    const drafts = getDrafts();
+    Object.keys(drafts).forEach(id => {
+      try { localStorage.removeItem('efix_photos_' + id); } catch(e) {}
+    });
     try { localStorage.removeItem('efix_drafts'); } catch(e) {}
     state.draftId = null;
     render();
@@ -473,6 +478,8 @@ function setupAutoSave() {
     autoSaveTimer = setInterval(() => {
       if (state.step > 0) saveDraft();
     }, 5000);
+  } else {
+    if (autoSaveTimer) { clearInterval(autoSaveTimer); autoSaveTimer = null; }
   }
 }
 
@@ -1709,6 +1716,10 @@ function buildData() {
   if (isElec) {
     data.supplyCharacteristics = {
       ze: s.ze, pfc: s.pfc,
+      earthingArrangement: s.earthingArrangement,
+      earthElectrodeType: s.earthingArrangement === 'TT' ? s.earthElectrodeType : "",
+      earthElectrodeResistance: s.earthingArrangement === 'TT' ? s.earthElectrodeResistance : "",
+      earthElectrodeLocation: s.earthingArrangement === 'TT' ? s.earthElectrodeLocation : "",
       protectiveDevice: s.supplyProtectiveDevice,
       protectiveDeviceRating: s.supplyProtectiveDeviceRating,
       liveConductors: s.supplyLiveConductors,
@@ -2136,14 +2147,21 @@ function startNew() {
   if (confirm("Start a new certificate? Current draft will be saved.")) {
     saveDraft();
     state = {
-      step:0, certType:null, showVal:false, draftId: null,
-      clientName:"", clientAddress:"", clientTown:"", clientPostcode:"", clientPhone:"",
-      installAddress:"", installSame:true, dateOfWork:new Date().toISOString().split("T")[0],
-      installationType:[], description:"", boardType:"rcbo",
-      reportPurpose:"", previousReportAvailable:"", recordsAvailable:"",
-      estimatedInstallAge:"", installationCategory:"", evidenceOfAlterations:"", alterationsEstimatedAge:"",
-      ze:"", pfc:"", overallAssessment:"", observations:[], jobNotes:"", jobPhotos:[],
-      circuits:[blankCircuit()], selectedTemplate:null, expandedCircuit:0,
+      step: 0, certType: null, showVal: false, draftId: null,
+      clientName: "", clientAddress: "", clientTown: "", clientPostcode: "", clientPhone: "",
+      installStreet: "", installTown: "", installPostcode: "",
+      dateOfWork: new Date().toISOString().split("T")[0],
+      installationType: [], description: "", boardType: "rcbo",
+      reportPurpose: "", previousReportAvailable: "", recordsAvailable: "",
+      estimatedInstallAge: "", installationCategory: "", evidenceOfAlterations: "", alterationsEstimatedAge: "",
+      existingComments: "",
+      ze: "", pfc: "", earthingArrangement: "", earthElectrodeResistance: "", earthElectrodeLocation: "", earthElectrodeType: "",
+      supplyLiveConductors: "", supplyAC: "", supplyDC: "", supplyOther: "", supplyPolarity: "",
+      supplyProtectiveDevice: "", supplyProtectiveDeviceRating: "",
+      mainSwitchType: "", mainSwitchRating: "", mainSwitchPoles: "", mainSwitchHasRcd: false, mainSwitchRcdCurrent: "", mainSwitchRcdTimeDelay: "",
+      eqBondingPresent: false, eqBondingServices: [],
+      overallAssessment: "", observations: [], jobNotes: "", jobPhotos: [],
+      circuits: [blankCircuit()], selectedTemplate: null, expandedCircuit: 0,
       fireSystem: blankFireSystem(), fireDevices: [blankFireDevice()], expandedFireDevice: 0,
       emlightSystem: blankEmlightSystem(), emlightFittings: [blankEmlightFitting()], expandedEmlightFitting: 0,
     };
